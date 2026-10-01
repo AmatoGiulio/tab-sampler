@@ -177,7 +177,6 @@ async function openEditorOverlay(tabId: number): Promise<void> {
             transition-delay: 0ms !important;
           }
         }
-        }
       `;
 
       const stage = document.createElement('div');
@@ -335,7 +334,8 @@ async function stopCaptureAndOpenEditor(tabId: number): Promise<void> {
 
   if (sample.frames <= 0) {
     await browser.action.setPopup({ popup: '' });
-    await setIdleAction();
+    recordingTabId = null;
+    await setIdleAction(tabId);
     return;
   }
 
@@ -362,7 +362,7 @@ export default defineBackground(() => {
       } else if (status === 'idle') {
         const sample = await getLatestSampleMeta();
         if (sample && sample.frames > 0) {
-          await setEditingAction();
+          await setEditingAction(tabId);
           await openEditorOverlay(tabId);
         } else {
           await startCapture(tabId);
