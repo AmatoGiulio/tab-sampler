@@ -12,8 +12,8 @@ import {
   loadSample,
 } from '../../audio/store/sample-store';
 import { sendMessage } from '../../extension/messaging';
-import { LoopIcon } from '../../ui/LoopIcon';
 import { MorphIcon } from '../../ui/MorphIcon';
+import { SystemIcon } from '../../ui/SystemIcon';
 import './styles.css';
 
 const EMPTY_SELECTION: Selection = { start: 0, end: 0 };
@@ -167,7 +167,7 @@ function App() {
       container: waveformRef.current,
       peaks: sample.channelData,
       duration,
-      height: 146,
+      height: 118,
       waveColor: 'rgba(255,255,255,0.72)',
       progressColor: 'rgba(255,255,255,0.72)',
       cursorWidth: 0,
@@ -542,7 +542,7 @@ function App() {
           aria-label="New capture"
           title="New capture"
         >
-          <span aria-hidden="true">+</span>
+          <SystemIcon name="plus" size={14} strokeWidth={1.9} />
         </button>
         <button
           type="button"
@@ -552,7 +552,7 @@ function App() {
           aria-label="Export WAV"
           title="Export WAV"
         >
-          <span aria-hidden="true">↓</span>
+          <SystemIcon name="download" size={14} strokeWidth={1.9} />
         </button>
       </div>
 
@@ -560,7 +560,7 @@ function App() {
         <div className="sample-meta">
           <div className="sample-status">
             <span className="sample-status__dot" aria-hidden="true" />
-            <span>SAVED</span>
+            <span>SAMPLED</span>
           </div>
           <div className="sample-time">
             {formatReferenceTime(selectionDuration(selection))}
@@ -576,7 +576,7 @@ function App() {
           aria-label="Loop selection"
           title="Loop selection"
         >
-          <LoopIcon size={28} />
+          <SystemIcon name="rotateCcw" size={22} strokeWidth={1.75} />
         </button>
 
         <button
@@ -587,7 +587,7 @@ function App() {
           aria-label={playing ? 'Pause' : 'Play selection'}
           title={playing ? 'Pause' : 'Play selection'}
         >
-          <MorphIcon name={playing ? 'pause' : 'play'} size={24} />
+          <MorphIcon name={playing ? 'pause' : 'play'} size={22} />
         </button>
       </footer>
     </main>
