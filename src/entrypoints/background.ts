@@ -58,23 +58,22 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           position: absolute;
           top: 16px;
           right: 16px;
-          width: 352px;
-          height: 336px;
+          width: 64px;
+          height: 30px;
           overflow: hidden;
           pointer-events: auto;
-          border-radius: 48px;
+          border-radius: 18px;
           corner-shape: squircle;
           isolation: isolate;
 
           background:
-            radial-gradient(120% 88% at 18% -4%,
-              rgba(255,255,255,.085) 0%,
-              rgba(255,255,255,.018) 28%,
-              transparent 58%),
+            radial-gradient(110% 120% at 24% -20%,
+              rgba(255,255,255,.09) 0%,
+              rgba(255,255,255,.018) 34%,
+              transparent 64%),
             linear-gradient(180deg,
-              rgba(24,24,27,.66) 0%,
-              rgba(18,18,21,.63) 48%,
-              rgba(11,11,14,.74) 100%);
+              rgba(25,25,28,.78) 0%,
+              rgba(15,15,18,.80) 100%);
 
           -webkit-backdrop-filter:
             blur(42px)
@@ -88,14 +87,53 @@ async function openEditorOverlay(tabId: number): Promise<void> {
             contrast(104%);
 
           box-shadow:
+            0 10px 28px rgba(0,0,0,.28),
+            0 1px 0 rgba(255,255,255,.16) inset,
+            0 0 0 1px rgba(255,255,255,.035) inset;
+
+          transform-origin: 100% 0%;
+          transform: translate3d(0,0,0);
+          will-change: width, height, border-radius, box-shadow;
+          transition:
+            width 420ms cubic-bezier(.16,1,.3,1),
+            height 420ms cubic-bezier(.16,1,.3,1),
+            border-radius 420ms cubic-bezier(.16,1,.3,1),
+            box-shadow 360ms cubic-bezier(.16,1,.3,1);
+        }
+
+        .glass.is-open {
+          width: 352px;
+          height: 336px;
+          border-radius: 48px;
+          box-shadow:
             0 26px 64px rgba(0,0,0,.36),
             0 8px 22px rgba(0,0,0,.20),
             0 1px 0 rgba(255,255,255,.18) inset,
             0 0 0 1px rgba(255,255,255,.035) inset,
             0 -1px 0 rgba(0,0,0,.28) inset;
+        }
 
-          transform-origin: 94% 0%;
-          animation: glass-enter 220ms cubic-bezier(.2,.8,.2,1) both;
+        .island-seed {
+          position: absolute;
+          z-index: 4;
+          top: 50%;
+          left: 50%;
+          width: 7px;
+          height: 7px;
+          margin: -3.5px 0 0 -3.5px;
+          border-radius: 999px;
+          background: #ff3b30;
+          box-shadow: 0 0 10px rgba(255,59,48,.44);
+          opacity: 1;
+          transform: scale(1);
+          transition:
+            opacity 130ms ease 90ms,
+            transform 180ms cubic-bezier(.2,.8,.2,1) 80ms;
+        }
+
+        .glass.is-open .island-seed {
+          opacity: 0;
+          transform: scale(.72);
         }
 
         .glass::before {
@@ -131,46 +169,53 @@ async function openEditorOverlay(tabId: number): Promise<void> {
         }
 
         iframe {
-          position: relative;
+          position: absolute;
           z-index: 1;
+          top: 0;
+          right: 0;
           display: block;
           width: 352px;
           height: 336px;
           border: 0;
           background: transparent;
           color-scheme: dark;
+          opacity: 0;
+          transform: translate3d(0,0,0);
+          pointer-events: none;
+          transition: opacity 150ms ease 120ms;
         }
 
-        .glass.is-leaving {
-          animation: glass-exit 135ms cubic-bezier(.4,0,.8,.2) both;
+        .glass.is-open iframe {
+          opacity: 1;
+          pointer-events: auto;
         }
 
-        @keyframes glass-enter {
-          0% {
-            opacity: 0;
-            transform: translateY(-4px) scale(.988);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+        .glass.is-closing {
+          width: 64px;
+          height: 30px;
+          border-radius: 18px;
+          box-shadow:
+            0 10px 28px rgba(0,0,0,.22),
+            0 1px 0 rgba(255,255,255,.12) inset,
+            0 0 0 1px rgba(255,255,255,.025) inset;
+          transition-duration: 260ms;
         }
 
-        @keyframes glass-exit {
-          0% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(-4px) scale(.988);
-          }
+        .glass.is-closing iframe {
+          opacity: 0;
+          pointer-events: none;
+          transition-delay: 0ms;
+          transition-duration: 80ms;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .glass, .glass.is-leaving {
-            animation-duration: 1ms;
+          .glass,
+          .island-seed,
+          iframe {
+            transition-duration: 1ms !important;
+            transition-delay: 0ms !important;
           }
+        }
         }
       `;
 
@@ -180,13 +225,16 @@ async function openEditorOverlay(tabId: number): Promise<void> {
       const glass = document.createElement('div');
       glass.className = 'glass';
 
+      const seed = document.createElement('span');
+      seed.className = 'island-seed';
+
       const frame = document.createElement('iframe');
       frame.src = src;
       frame.title = 'Tab Sampler editor';
       frame.allow = 'autoplay';
       frame.setAttribute('aria-label', 'Tab Sampler audio editor');
 
-      glass.append(frame);
+      glass.append(seed, frame);
       stage.append(glass);
       shadow.append(style, stage);
       document.documentElement.append(host);
@@ -195,7 +243,8 @@ async function openEditorOverlay(tabId: number): Promise<void> {
       const close = () => {
         if (closed) return;
         closed = true;
-        glass.classList.add('is-leaving');
+        glass.classList.remove('is-open');
+        glass.classList.add('is-closing');
         window.setTimeout(() => {
           host.remove();
           document.removeEventListener('pointerdown', onPointerDown, true);
@@ -204,7 +253,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           if (pageWindow.__tabSamplerOverlayCleanup === cleanup) {
             delete pageWindow.__tabSamplerOverlayCleanup;
           }
-        }, 155);
+        }, 280);
       };
 
       const cleanup = () => {
@@ -225,6 +274,15 @@ async function openEditorOverlay(tabId: number): Promise<void> {
 
       const onMessage = (event: MessageEvent) => {
         if (event.source !== frame.contentWindow) return;
+
+        if (event.data?.type === 'tab-sampler:ready') {
+          window.requestAnimationFrame(() => {
+            glass.classList.remove('is-closing');
+            glass.classList.add('is-open');
+          });
+          return;
+        }
+
         if (event.data?.type === 'tab-sampler:close') close();
       };
 
