@@ -39,6 +39,7 @@ export function mountSamplerSurfaceDom(
 
     .surface {
       position: absolute;
+      z-index: 5;
       top: 16px;
       right: 16px;
       width: 44px;
@@ -667,6 +668,10 @@ export function mountSamplerSurfaceDom(
         morphShell.style.transform = 'translate3d(0,0,0) scale(1,1)';
         morphShell.style.borderRadius = '25px';
 
+        sourceFadeAnimation?.cancel();
+        destinationFadeAnimation?.cancel();
+        morphAnimation?.cancel();
+
         surface.style.opacity = '1';
         surface.classList.remove('is-morphing');
 
@@ -770,6 +775,10 @@ export function mountSamplerSurfaceDom(
         morphShell.style.opacity = '0';
         morphShell.style.transform = 'translate3d(0,0,0) scale(1,1)';
         morphShell.style.borderRadius = '25px';
+
+        sourceFadeAnimation?.cancel();
+        destinationFadeAnimation?.cancel();
+        morphAnimation?.cancel();
 
         surface.style.opacity = '1';
         surface.classList.remove('is-morphing');
