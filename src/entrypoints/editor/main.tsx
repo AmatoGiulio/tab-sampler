@@ -167,12 +167,12 @@ function App() {
       container: waveformRef.current,
       peaks: sample.channelData,
       duration,
-      height: 168,
+      height: 146,
       waveColor: 'rgba(255,255,255,0.72)',
       progressColor: 'rgba(255,255,255,0.72)',
       cursorWidth: 0,
-      barWidth: 3,
-      barGap: 2,
+      barWidth: 2,
+      barGap: 3,
       barRadius: 2,
       dragToSeek: { debounceTime: 0 },
       hideScrollbar: true,
@@ -479,29 +479,6 @@ function App() {
 
   return (
     <main className={`editor ${ready ? 'is-ready' : ''}`}>
-      <header className="editor__header">
-        <button
-          type="button"
-          className="header-action header-action--new"
-          onClick={() => void newCapture()}
-          disabled={discarding || exporting}
-          title="Discard sample and start a new capture"
-        >
-          New
-        </button>
-
-        <button
-          type="button"
-          className="header-action header-action--export"
-          onClick={() => void exportSample()}
-          disabled={exporting || discarding || !ready}
-          aria-label="Export WAV"
-          title="Export WAV"
-        >
-          Export
-        </button>
-      </header>
-
       <section className="wave-shell" aria-label="Captured audio waveform">
         <span className="record-seed" aria-hidden="true" />
         <div ref={waveformRef} className="waveform" />
@@ -555,6 +532,29 @@ function App() {
           <span className="playhead__cap" />
         </div>
       </section>
+
+      <div className="utility-actions" aria-label="Sample actions">
+        <button
+          type="button"
+          className="utility-action"
+          onClick={() => void newCapture()}
+          disabled={discarding || exporting}
+          aria-label="New capture"
+          title="New capture"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+        <button
+          type="button"
+          className="utility-action"
+          onClick={() => void exportSample()}
+          disabled={exporting || discarding || !ready}
+          aria-label="Export WAV"
+          title="Export WAV"
+        >
+          <span aria-hidden="true">↓</span>
+        </button>
+      </div>
 
       <footer className="controls">
         <div className="sample-meta">
