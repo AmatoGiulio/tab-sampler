@@ -18,7 +18,7 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #343434;
+  background: transparent;
 }
 
 body {
@@ -29,21 +29,20 @@ button { font: inherit; }
 
 .editor {
   position: relative;
-  width: 400px;
-  min-height: 400px;
+  width: 420px;
+  min-height: 420px;
   padding: 18px 20px 20px;
   display: grid;
   grid-template-rows: 24px 1fr 108px;
   gap: 8px;
   overflow: hidden;
-  border-radius: 40px;
+  border-radius: 0;
   background:
     radial-gradient(circle at 50% 36%, rgba(255,255,255,0.035), transparent 42%),
     linear-gradient(180deg, #1d1d1e 0%, #171718 55%, #141415 100%);
   box-shadow:
-    0 24px 50px rgba(0, 0, 0, 0.42),
-    0 2px 1px rgba(255, 255, 255, 0.22) inset,
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    0 2px 1px rgba(255, 255, 255, 0.16) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   user-select: none;
 }
 
@@ -52,7 +51,7 @@ button { font: inherit; }
   position: absolute;
   inset: 0;
   pointer-events: none;
-  border-radius: inherit;
+  border-radius: 0;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.055), transparent 9%),
     radial-gradient(circle at 50% 110%, rgba(255,255,255,0.02), transparent 36%);
