@@ -260,7 +260,7 @@ button { font: inherit; }
   z-index: 10;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 68px 90px;
-  align-items: end;
+  align-items: center;
   gap: 14px;
   padding: 0 2px 2px;
 }
@@ -332,10 +332,10 @@ button { font: inherit; }
 .control--loop {
   justify-self: center;
   width: 64px;
-  height: 98px;
+  height: 90px;
   display: grid;
   place-items: center;
-  border-radius: 32px;
+  border-radius: 30px;
   corner-shape: squircle;
   background:
     radial-gradient(circle at 45% 20%, rgba(255,255,255,.035), transparent 32%),
