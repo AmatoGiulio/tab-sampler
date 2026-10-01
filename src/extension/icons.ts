@@ -15,29 +15,82 @@ const iconPaths = {
   },
 } as const;
 
-export async function setIdleAction(): Promise<void> {
+const REC_BADGE = {
+  text: 'REC',
+  background: '#E72A24',
+  textColor: '#FFFFFF',
+} as const;
+
+async function clearBadge(tabId?: number): Promise<void> {
+  const details = tabId === undefined ? {} : { tabId };
+
   await Promise.all([
-    browser.action.setIcon({ path: iconPaths.idle }),
-    browser.action.setTitle({ title: 'Click to capture tab audio' }),
+    browser.action.setBadgeText({ ...details, text: '' }),
+    browser.action.setBadgeBackgroundColor({
+      ...details,
+      color: '#00000000',
+    }),
   ]);
 }
 
-export async function setRecordingAction(): Promise<void> {
+export async function setIdleAction(tabId?: number): Promise<void> {
+  const details = tabId === undefined ? {} : { tabId };
+
   await Promise.all([
-    browser.action.setIcon({ path: iconPaths.recording }),
-    browser.action.setTitle({ title: 'Recording - click to stop' }),
+    browser.action.setIcon({ ...details, path: iconPaths.idle }),
+    browser.action.setTitle({
+      ...details,
+      title: 'Click to capture tab audio',
+    }),
+    clearBadge(tabId),
   ]);
 }
 
-export function setRecordingPulse(bright: boolean): Promise<void> {
+export async function setRecordingAction(tabId?: number): Promise<void> {
+  const details = tabId === undefined ? {} : { tabId };
+
+  await Promise.all([
+    browser.action.setIcon({ ...details, path: iconPaths.recording }),
+    browser.action.setTitle({
+      ...details,
+      title: 'Recording - click to stop',
+    }),
+    browser.action.setBadgeText({
+      ...details,
+      text: REC_BADGE.text,
+    }),
+    browser.action.setBadgeBackgroundColor({
+      ...details,
+      color: REC_BADGE.background,
+    }),
+    browser.action.setBadgeTextColor({
+      ...details,
+      color: REC_BADGE.textColor,
+    }),
+  ]);
+}
+
+export function setRecordingPulse(
+  bright: boolean,
+  tabId?: number,
+): Promise<void> {
+  const details = tabId === undefined ? {} : { tabId };
+
   return browser.action.setIcon({
+    ...details,
     path: bright ? iconPaths.recording : iconPaths.recordingDim,
   });
 }
 
-export async function setEditingAction(): Promise<void> {
+export async function setEditingAction(tabId?: number): Promise<void> {
+  const details = tabId === undefined ? {} : { tabId };
+
   await Promise.all([
-    browser.action.setIcon({ path: iconPaths.idle }),
-    browser.action.setTitle({ title: 'Open captured sample' }),
+    browser.action.setIcon({ ...details, path: iconPaths.idle }),
+    browser.action.setTitle({
+      ...details,
+      title: 'Open captured sample',
+    }),
+    clearBadge(tabId),
   ]);
 }
