@@ -93,14 +93,22 @@
 
       const stage = host.shadowRoot.querySelector('.stage');
       const surface = host.shadowRoot.querySelector('.surface');
-      if (!(stage instanceof HTMLElement) || !(surface instanceof HTMLElement)) return;
+      const morphShell = host.shadowRoot.querySelector('.morph-shell');
+      if (
+        !(stage instanceof HTMLElement) ||
+        !(surface instanceof HTMLElement) ||
+        !(morphShell instanceof HTMLElement)
+      ) return;
 
       stage.style.inset = '50% auto auto 50%';
       stage.style.width = '352px';
       stage.style.height = '336px';
       stage.style.transform = 'translate(-50%, -50%)';
+
       surface.style.top = '0';
       surface.style.right = '0';
+      morphShell.style.top = '0';
+      morphShell.style.right = '0';
     });
   </script>
 </body>
