@@ -467,51 +467,26 @@ function App() {
   return (
     <main className={`editor ${ready ? 'is-ready' : ''}`}>
       <header className="editor__header">
-        <div className="editor__header-left">
-          <button
-            type="button"
-            className="header-action"
-            onClick={() => void newCapture()}
-            disabled={discarding || exporting}
-            title="Discard sample and start a new capture"
-          >
-            New
-          </button>
-          <span className="editor__format">
-            {Math.round(sample.meta.sampleRate / 1000)} kHz
-            {' / '}
-            {sample.meta.channels === 1 ? 'mono' : 'stereo'}
-            {' / 32f'}
-          </span>
-        </div>
+        <button
+          type="button"
+          className="header-action header-action--new"
+          onClick={() => void newCapture()}
+          disabled={discarding || exporting}
+          title="Discard sample and start a new capture"
+        >
+          New
+        </button>
 
-        <div className="editor__header-right">
-          <div className="zoom-controls" aria-label="Waveform zoom">
-            <button
-              type="button"
-              className="zoom-control"
-              onClick={() => applyZoomRef.current(zoomRef.current / ZOOM_STEP)}
-              disabled={!ready || zoom <= 1.001}
-              aria-label="Zoom out"
-              title="Zoom out (-)"
-            >
-              -
-            </button>
-            <button
-              type="button"
-              className="zoom-control"
-              onClick={() => applyZoomRef.current(zoomRef.current * ZOOM_STEP)}
-              disabled={!ready || zoom >= MAX_ZOOM_FACTOR - 0.001}
-              aria-label="Zoom in"
-              title="Zoom in (+)"
-            >
-              +
-            </button>
-          </div>
-          <span className="editor__duration">
-            {formatSeconds(selectionDuration(selection))}
-          </span>
-        </div>
+        <button
+          type="button"
+          className="header-action header-action--export"
+          onClick={() => void exportSample()}
+          disabled={exporting || discarding || !ready}
+          aria-label="Export WAV"
+          title="Export WAV"
+        >
+          Export
+        </button>
       </header>
 
       <section className="wave-shell" aria-label="Captured audio waveform">
@@ -569,6 +544,16 @@ function App() {
       </section>
 
       <footer className="controls">
+        <div className="sample-meta">
+          <div className="sample-status">
+            <span className="sample-status__dot" aria-hidden="true" />
+            <span>SAVED</span>
+          </div>
+          <div className="sample-time">
+            {formatSeconds(selectionDuration(selection))}
+          </div>
+        </div>
+
         <button
           type="button"
           className={`control control--loop ${loop ? 'is-active' : ''}`}
@@ -578,8 +563,7 @@ function App() {
           aria-label="Loop selection"
           title="Loop selection"
         >
-          <LoopIcon size={15} />
-          <span>Loop</span>
+          <LoopIcon size={22} />
         </button>
 
         <button
@@ -590,19 +574,7 @@ function App() {
           aria-label={playing ? 'Pause' : 'Play selection'}
           title={playing ? 'Pause' : 'Play selection'}
         >
-          <MorphIcon name={playing ? 'pause' : 'play'} size={18} />
-        </button>
-
-        <button
-          type="button"
-          className="control control--export"
-          onClick={() => void exportSample()}
-          disabled={exporting || discarding || !ready}
-          aria-label="Export WAV"
-          title="Export WAV"
-        >
-          <span>Export</span>
-          <MorphIcon name="download" size={15} />
+          <MorphIcon name={playing ? 'pause' : 'play'} size={24} />
         </button>
       </footer>
     </main>
