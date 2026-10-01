@@ -22,7 +22,35 @@ function roundedRect(
   ctx.closePath();
 }
 
-function drawPillIcon(size: number, state: IconState): ImageData {
+function drawWaveGlyph(
+  ctx: OffscreenCanvasRenderingContext2D,
+  size: number,
+  color: string,
+) {
+  const s = size / 16;
+  const cx = size / 2;
+  const cy = size / 2;
+  const bars = [
+    { x: -4.6, h: 3.0 },
+    { x: -2.3, h: 6.2 },
+    { x: 0, h: 9.2 },
+    { x: 2.3, h: 6.2 },
+    { x: 4.6, h: 3.0 },
+  ];
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.4 * s;
+  ctx.lineCap = 'round';
+
+  for (const bar of bars) {
+    ctx.beginPath();
+    ctx.moveTo(cx + bar.x * s, cy - (bar.h * s) / 2);
+    ctx.lineTo(cx + bar.x * s, cy + (bar.h * s) / 2);
+    ctx.stroke();
+  }
+}
+
+function drawIcon(size: number, state: IconState): ImageData {
   const canvas = new OffscreenCanvas(size, size);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Unable to create toolbar icon canvas');
@@ -30,87 +58,50 @@ function drawPillIcon(size: number, state: IconState): ImageData {
   const s = size / 16;
   ctx.clearRect(0, 0, size, size);
 
-  const x = 0.6 * s;
-  const y = 3.25 * s;
-  const w = 14.8 * s;
-  const h = 9.5 * s;
-  const r = 3.2 * s;
+  if (state === 'recording' || state === 'recordingDim') {
+    const alpha = state === 'recording' ? 1 : 0.58;
 
-  const isRecording = state === 'recording' || state === 'recordingDim';
-
-  roundedRect(ctx, x, y, w, h, r);
-
-  if (isRecording) {
-    const gradient = ctx.createLinearGradient(0, y, 0, y + h);
-    gradient.addColorStop(0, state === 'recording' ? '#FF453A' : '#D52C27');
-    gradient.addColorStop(1, state === 'recording' ? '#E6241D' : '#AE211C');
-    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 5.35 * s, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 59, 48, ${alpha})`;
     ctx.fill();
 
-    ctx.strokeStyle = state === 'recording'
-      ? 'rgba(255,255,255,.26)'
-      : 'rgba(255,255,255,.14)';
-    ctx.lineWidth = .65 * s;
-    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 2.1 * s, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.96)';
+    ctx.fill();
   } else {
-    const gradient = ctx.createLinearGradient(0, y, 0, y + h);
-    gradient.addColorStop(0, 'rgba(54,54,56,.98)');
-    gradient.addColorStop(1, 'rgba(24,24,26,.98)');
+    roundedRect(ctx, 1.3 * s, 2.0 * s, 13.4 * s, 12 * s, 3.3 * s);
+    const gradient = ctx.createLinearGradient(0, 2 * s, 0, 14 * s);
+    gradient.addColorStop(0, 'rgba(64,64,67,.98)');
+    gradient.addColorStop(1, 'rgba(26,26,28,.98)');
     ctx.fillStyle = gradient;
     ctx.fill();
 
     ctx.strokeStyle = 'rgba(255,255,255,.34)';
-    ctx.lineWidth = .65 * s;
-    ctx.stroke();
-  }
-
-  // Left-side capture marker.
-  const markerX = 3.55 * s;
-  const markerY = 8 * s;
-  if (isRecording) {
-    ctx.beginPath();
-    ctx.arc(markerX, markerY, 1.45 * s, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.globalAlpha = state === 'recording' ? 1 : .72;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  } else {
-    ctx.beginPath();
-    ctx.arc(markerX, markerY, 1.25 * s, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,.94)';
-    ctx.lineWidth = .8 * s;
+    ctx.lineWidth = .7 * s;
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(markerX, markerY, .45 * s, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,.94)';
-    ctx.fill();
-  }
-
-  ctx.fillStyle = isRecording
-    ? '#FFFFFF'
-    : 'rgba(255,255,255,.94)';
-  ctx.font = `700 ${4.75 * s}px Arial, sans-serif`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('REC', 6.05 * s, 8.1 * s);
-
-  if (state === 'editing') {
-    ctx.globalAlpha = .78;
+    drawWaveGlyph(
+      ctx,
+      size,
+      state === 'editing'
+        ? 'rgba(255,255,255,.76)'
+        : 'rgba(255,255,255,.96)',
+    );
   }
 
   return ctx.getImageData(0, 0, size, size);
 }
 
 function getIconData(state: IconState): Record<number, ImageData> {
-  const existing = cache.get(state);
-  if (existing) return existing;
+  const cached = cache.get(state);
+  if (cached) return cached;
 
   const data = {
-    16: drawPillIcon(16, state),
-    32: drawPillIcon(32, state),
+    16: drawIcon(16, state),
+    32: drawIcon(32, state),
   };
-
   cache.set(state, data);
   return data;
 }
@@ -132,10 +123,7 @@ async function applyIcon(
       ...details,
       imageData: getIconData(state),
     }),
-    browser.action.setTitle({
-      ...details,
-      title,
-    }),
+    browser.action.setTitle({ ...details, title }),
     clearBadge(tabId),
   ]);
 }
