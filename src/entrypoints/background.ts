@@ -95,7 +95,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
             0 -1px 0 rgba(0,0,0,.28) inset;
 
           transform-origin: 94% 0%;
-          animation: glass-enter 270ms cubic-bezier(.18,.86,.24,1) both;
+          animation: glass-enter 220ms cubic-bezier(.2,.8,.2,1) both;
         }
 
         .glass::before {
@@ -148,18 +148,11 @@ async function openEditorOverlay(tabId: number): Promise<void> {
         @keyframes glass-enter {
           0% {
             opacity: 0;
-            transform: translateY(-5px) scale(.985);
-            filter: saturate(85%) brightness(88%);
-          }
-          48% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            filter: saturate(108%) brightness(98%);
+            transform: translateY(-4px) scale(.988);
           }
           100% {
             opacity: 1;
             transform: translateY(0) scale(1);
-            filter: saturate(100%) brightness(100%);
           }
         }
 
