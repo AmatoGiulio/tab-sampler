@@ -373,6 +373,8 @@ export function mountSamplerSurfaceDom(
   let timerRaf = 0;
   let closed = false;
   let demoMeterTimer = 0;
+  let demoResetTimer = 0;
+  let demoUnloadTimer = 0;
 
   const resizeCanvas = () => {
     const rect = canvas.getBoundingClientRect();
@@ -458,13 +460,28 @@ export function mountSamplerSurfaceDom(
   const resetShowcase = () => {
     if (environment !== 'showcase') return;
 
-    surface.classList.remove('is-editor-ready', 'is-expanded', 'is-frozen');
-    frame.removeAttribute('src');
-    frozenAt = null;
-    startedAt = performance.now();
-    smoothedPeak = .04;
-    peaks.fill(.04);
-    drawWave();
+    if (demoResetTimer) window.clearTimeout(demoResetTimer);
+    if (demoUnloadTimer) window.clearTimeout(demoUnloadTimer);
+
+    // First fade the editor while it is still fully rendered.
+    // Removing iframe.src immediately navigates it to about:blank and can
+    // expose a bright frame during the collapse.
+    surface.classList.remove('is-editor-ready');
+
+    demoResetTimer = window.setTimeout(() => {
+      surface.classList.remove('is-expanded', 'is-frozen');
+
+      frozenAt = null;
+      startedAt = performance.now();
+      smoothedPeak = .04;
+      peaks.fill(.04);
+      drawWave();
+    }, 90);
+
+    // Unload only after both the editor fade and the island collapse are done.
+    demoUnloadTimer = window.setTimeout(() => {
+      frame.removeAttribute('src');
+    }, 520);
   };
 
   const requestStop = () => {
@@ -494,6 +511,8 @@ export function mountSamplerSurfaceDom(
     surface.classList.add('is-closing');
     window.cancelAnimationFrame(timerRaf);
     if (demoMeterTimer) window.clearInterval(demoMeterTimer);
+    if (demoResetTimer) window.clearTimeout(demoResetTimer);
+    if (demoUnloadTimer) window.clearTimeout(demoUnloadTimer);
 
     window.setTimeout(() => cleanup(), 140);
   };
