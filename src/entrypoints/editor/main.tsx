@@ -563,7 +563,7 @@ function App() {
           aria-label="Loop selection"
           title="Loop selection"
         >
-          <LoopIcon size={22} />
+          <LoopIcon size={28} />
         </button>
 
         <button
