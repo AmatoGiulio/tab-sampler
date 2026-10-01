@@ -163,6 +163,12 @@ async function mountSamplerSurface(
           width: 198px;
           height: 50px;
           border-radius: 25px;
+          pointer-events: auto;
+          cursor: pointer;
+        }
+
+        .surface.is-frozen {
+          cursor: default;
         }
 
         .surface.is-expanded {
@@ -435,6 +441,21 @@ async function mountSamplerSurface(
         surface.classList.add('is-frozen');
       };
 
+      const requestStop = () => {
+        if (
+          closed ||
+          frozenAt !== null ||
+          surface.classList.contains('is-expanded')
+        ) {
+          return;
+        }
+
+        freeze();
+        void chrome.runtime.sendMessage({
+          type: 'tab-sampler:stop-request',
+        });
+      };
+
       const expand = () => {
         freeze();
         surface.classList.add('is-expanded');
@@ -510,6 +531,7 @@ async function mountSamplerSurface(
       const cleanup = () => {
         closed = true;
         window.cancelAnimationFrame(timerRaf);
+        surface.removeEventListener('click', requestStop);
         chrome.runtime.onMessage.removeListener(runtimeListener);
         window.removeEventListener('message', onWindowMessage);
         document.removeEventListener('pointerdown', onPointerDown, true);
@@ -521,6 +543,7 @@ async function mountSamplerSurface(
         }
       };
 
+      surface.addEventListener('click', requestStop);
       chrome.runtime.onMessage.addListener(runtimeListener);
       window.addEventListener('message', onWindowMessage);
       document.addEventListener('pointerdown', onPointerDown, true);
@@ -691,6 +714,30 @@ async function stopCaptureAndExpandEditor(tabId: number): Promise<void> {
 
 export default defineBackground(() => {
   void restoreActionState();
+
+  browser.runtime.onMessage.addListener((message, sender) => {
+    if (message?.type !== 'tab-sampler:stop-request') return;
+
+    const senderTabId = sender.tab?.id;
+    const tabId = recordingTabId ?? senderTabId;
+    if (typeof tabId !== 'number' || busy) return;
+
+    busy = true;
+
+    void (async () => {
+      try {
+        const status = await captureStatus();
+        if (status === 'recording') {
+          await stopCaptureAndExpandEditor(tabId);
+        }
+      } catch (error) {
+        console.error('[tab-sampler] island stop failed', error);
+        await restoreActionState();
+      } finally {
+        busy = false;
+      }
+    })();
+  });
 
   browser.action.onClicked.addListener(async (tab) => {
     if (busy) return;
