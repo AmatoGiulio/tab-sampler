@@ -56,13 +56,13 @@ async function openEditorOverlay(tabId: number): Promise<void> {
 
         .glass {
           position: absolute;
-          top: 18px;
-          right: 18px;
-          width: 400px;
-          height: 400px;
+          top: 16px;
+          right: 16px;
+          width: 352px;
+          height: 336px;
           overflow: hidden;
           pointer-events: auto;
-          border-radius: 58px;
+          border-radius: 48px;
           corner-shape: squircle;
           isolation: isolate;
 
@@ -95,7 +95,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
             0 -1px 0 rgba(0,0,0,.28) inset;
 
           transform-origin: 94% 0%;
-          animation: glass-enter 360ms both;
+          animation: glass-enter 300ms both;
         }
 
         .glass::before {
@@ -123,7 +123,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           inset: 1px;
           z-index: 2;
           pointer-events: none;
-          border-radius: 57px;
+          border-radius: 47px;
           corner-shape: squircle;
           box-shadow:
             0 0 0 1px rgba(255,255,255,.045) inset,
@@ -134,8 +134,8 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           position: relative;
           z-index: 1;
           display: block;
-          width: 400px;
-          height: 400px;
+          width: 352px;
+          height: 336px;
           border: 0;
           background: transparent;
           color-scheme: dark;
@@ -148,14 +148,11 @@ async function openEditorOverlay(tabId: number): Promise<void> {
         @keyframes glass-enter {
           0% {
             opacity: 0;
-            transform: translateY(-12px) scale(.94);
+            transform: translateY(-8px) scale(.965);
           }
-          58% {
+          68% {
             opacity: 1;
-            transform: translateY(1px) scale(1.006);
-          }
-          78% {
-            transform: translateY(0) scale(.998);
+            transform: translateY(0) scale(1.004);
           }
           100% {
             opacity: 1;
