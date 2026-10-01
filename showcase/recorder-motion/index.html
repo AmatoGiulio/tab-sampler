@@ -3,11 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tab Sampler — Recorder Motion</title>
+  <title>Tab Sampler — Material Motion Study</title>
   <style>
     :root {
       color-scheme: dark;
-      background: #08090b;
+      background: #0b0b0d;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Text",
+        Inter,
+        "Segoe UI",
+        sans-serif;
     }
 
     * {
@@ -20,13 +27,108 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
+    }
+
+    body {
+      position: relative;
       background:
-        radial-gradient(
-          circle at 50% 46%,
-          rgba(255,255,255,.035),
-          transparent 34%
-        ),
-        #08090b;
+        radial-gradient(circle at 18% 22%, rgba(109, 91, 255, .32), transparent 28%),
+        radial-gradient(circle at 78% 72%, rgba(255, 92, 72, .24), transparent 31%),
+        radial-gradient(circle at 66% 12%, rgba(76, 186, 255, .20), transparent 24%),
+        #0b0b0d;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .page {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: minmax(260px, .8fr) minmax(360px, 1.2fr);
+      gap: 7vw;
+      align-items: center;
+      padding: 8vw 9vw;
+      opacity: .94;
+    }
+
+    .copy {
+      max-width: 520px;
+    }
+
+    .eyebrow {
+      margin: 0 0 18px;
+      color: rgba(255,255,255,.46);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: .20em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      color: rgba(255,255,255,.91);
+      font-size: clamp(42px, 6vw, 92px);
+      font-weight: 590;
+      line-height: .94;
+      letter-spacing: -.055em;
+    }
+
+    .body-copy {
+      margin: 24px 0 0;
+      max-width: 430px;
+      color: rgba(255,255,255,.38);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .art {
+      position: relative;
+      width: min(46vw, 620px);
+      aspect-ratio: 1;
+      justify-self: end;
+      border-radius: 38px;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.02)),
+        radial-gradient(circle at 28% 30%, rgba(255,120,95,.82), transparent 26%),
+        radial-gradient(circle at 72% 63%, rgba(65,114,255,.78), transparent 30%),
+        radial-gradient(circle at 55% 18%, rgba(182,93,255,.50), transparent 24%),
+        #131317;
+      box-shadow:
+        0 44px 90px rgba(0,0,0,.28),
+        0 1px 0 rgba(255,255,255,.12) inset;
+    }
+
+    .art::before,
+    .art::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(1px);
+    }
+
+    .art::before {
+      width: 44%;
+      height: 44%;
+      left: 11%;
+      top: 18%;
+      border: 1px solid rgba(255,255,255,.34);
+      box-shadow:
+        0 0 0 20px rgba(255,255,255,.025),
+        0 0 0 64px rgba(255,255,255,.018);
+    }
+
+    .art::after {
+      width: 13%;
+      height: 13%;
+      right: 14%;
+      bottom: 16%;
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 0 48px rgba(255,255,255,.22);
     }
 
     #showcase-root {
@@ -46,15 +148,14 @@
       left: 50%;
       bottom: 24px;
       transform: translateX(-50%);
-      color: rgba(255,255,255,.28);
-      font:
-        11px/1.2
-        Inter,
-        ui-sans-serif,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
+      padding: 7px 11px;
+      border-radius: 999px;
+      color: rgba(255,255,255,.48);
+      background: rgba(0,0,0,.20);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      font-size: 10px;
+      letter-spacing: .02em;
       white-space: nowrap;
       user-select: none;
     }
@@ -64,6 +165,20 @@
     }
 
     @media (max-width: 760px) {
+      .page {
+        grid-template-columns: 1fr;
+        padding: 9vw;
+      }
+
+      .copy {
+        opacity: .45;
+      }
+
+      .art {
+        width: 78vw;
+        justify-self: center;
+      }
+
       #showcase-root {
         transform: scale(.95);
       }
@@ -71,6 +186,20 @@
   </style>
 </head>
 <body>
+  <div class="scene" aria-hidden="true">
+    <div class="page">
+      <div class="copy">
+        <p class="eyebrow">Material motion study</p>
+        <h1>Capture<br />what you hear.</h1>
+        <p class="body-copy">
+          A live backdrop intentionally sits behind the exact extension surface so
+          blur, contrast, edge light and motion can be judged without installing the extension.
+        </p>
+      </div>
+      <div class="art"></div>
+    </div>
+  </div>
+
   <div id="showcase-root"></div>
   <div class="hint">click stop · R reset · ?clean=1</div>
 
@@ -82,8 +211,6 @@
       document.body.classList.add('clean');
     }
 
-    // The standalone page intentionally mounts the exact same recorder surface
-    // function used by the Chrome extension. Only the environment adapter differs.
     mountSamplerSurfaceDom(
       '/src/entrypoints/editor/index.html?demo=1',
       '__tab_sampler_showcase__',
@@ -91,8 +218,6 @@
       'showcase',
     );
 
-    // Reposition the exact extension surface in the center of the capture canvas
-    // without changing its internal geometry or motion.
     requestAnimationFrame(() => {
       const host = document.getElementById('__tab_sampler_showcase__');
       if (!host?.shadowRoot) return;

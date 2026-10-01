@@ -105,6 +105,7 @@ function App() {
   const [loop, setLoop] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [ready, setReady] = useState(false);
+  const [presented, setPresented] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -367,6 +368,17 @@ function App() {
   }, [ready]);
 
   useEffect(() => {
+    const onPresentationMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'tab-sampler:present') {
+        setPresented(true);
+      }
+    };
+
+    window.addEventListener('message', onPresentationMessage);
+    return () => window.removeEventListener('message', onPresentationMessage);
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === ' ' && ready) {
         event.preventDefault();
@@ -538,7 +550,7 @@ function App() {
   const endBoundaryVisible = selection.end >= visibleRange.start && selection.end <= visibleRange.end;
 
   return (
-    <main className={`editor ${ready ? 'is-ready' : ''}`}>
+    <main className={`editor ${ready ? 'is-ready' : ''} ${presented ? 'is-presented' : ''}`}>
       <section className="wave-shell" aria-label="Captured audio waveform">
         <span className="record-seed" aria-hidden="true" />
         <div ref={waveformRef} className="waveform" />
