@@ -5,6 +5,11 @@ import { onMessage, sendMessage } from '../../extension/messaging';
 import { openChromeTabAudioStream } from '../../platform/chrome/tab-audio-stream';
 
 const recorder = new PcmRecorder(indexedDbSampleSink);
+
+recorder.onMeter(({ peak, rms }) => {
+  void sendMessage('background:meter', { peak, rms });
+});
+
 let pulseTimer: number | undefined;
 let pulseBright = true;
 
