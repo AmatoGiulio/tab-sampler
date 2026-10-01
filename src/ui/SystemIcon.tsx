@@ -1,5 +1,5 @@
 interface SystemIconProps {
-  name: 'plus' | 'download' | 'rotateCcw';
+  name: 'plus' | 'download' | 'repeat';
   size?: number;
   strokeWidth?: number;
 }
@@ -7,21 +7,25 @@ interface SystemIconProps {
 const paths = {
   plus: (
     <>
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
+      <path d="M12 4.5v15" />
+      <path d="M4.5 12h15" />
     </>
   ),
   download: (
     <>
-      <path d="M12 3v12" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
+      <path d="M12 3.5v11.5" />
+      <path d="m7.25 10.5 4.75 4.75 4.75-4.75" />
+      <path d="M5.5 20.5h13" />
     </>
   ),
-  rotateCcw: (
+  // Two arrows chasing each other: reads as "repeat", where a single
+  // counter-clockwise arrow reads as "undo".
+  repeat: (
     <>
-      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-      <path d="M3 3v5h5" />
+      <path d="m17 2 4 4-4 4" />
+      <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+      <path d="m7 22-4-4 4-4" />
+      <path d="M21 13v1a4 4 0 0 1-4 4H3" />
     </>
   ),
 } as const;
@@ -29,7 +33,7 @@ const paths = {
 export function SystemIcon({
   name,
   size = 20,
-  strokeWidth = 1.8,
+  strokeWidth = 2,
 }: SystemIconProps) {
   return (
     <svg

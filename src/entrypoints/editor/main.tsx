@@ -12,15 +12,23 @@ import {
   loadSample,
 } from '../../audio/store/sample-store';
 import { sendMessage } from '../../extension/messaging';
-import { MorphIcon } from '../../ui/MorphIcon';
+import { PlayPauseIcon } from '../../ui/PlayPauseIcon';
 import { SystemIcon } from '../../ui/SystemIcon';
 import './styles.css';
 
 const EMPTY_SELECTION: Selection = { start: 0, end: 0 };
 const MAX_ZOOM_FACTOR = 24;
 const ZOOM_STEP = 1.55;
+const ZOOM_ANIMATION_MS = 240;
+const PINCH_SENSITIVITY = 0.01;
+const DOUBLE_CLICK_ZOOM = 3;
+const EDGE_SCROLL_ZONE = 28;
+const EDGE_SCROLL_SPEED = 9;
+const NUDGE_SECONDS = 0.01;
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MIN_SELECTION_SECONDS = 0.025;
 const DEMO_MODE = new URLSearchParams(window.location.search).get('demo') === '1';
+const EMBEDDED = window.parent !== window;
 
 function createDemoSample(): LoadedSample {
   const sampleRate = 48_000;
@@ -66,6 +74,12 @@ interface VisibleRange {
   end: number;
 }
 
+/** Keeps `time` pinned at `fraction` of the viewport while the scale changes. */
+interface ZoomAnchor {
+  time: number;
+  fraction: number;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -76,11 +90,8 @@ function formatReferenceTime(seconds: number): string {
   const wholeSeconds = Math.floor(safe % 60);
   const centiseconds = Math.floor((safe - Math.floor(safe)) * 100);
 
-  return [
-    String(wholeMinutes).padStart(2, '0'),
-    String(wholeSeconds).padStart(2, '0'),
-    String(centiseconds).padStart(2, '0'),
-  ].join(':');
+  // m:ss.cc — minutes and seconds read as time, the fraction as a fraction.
+  return `${wholeMinutes}:${String(wholeSeconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
 }
 
 function App() {
@@ -94,8 +105,15 @@ function App() {
   const visibleRangeRef = useRef<VisibleRange>({ start: 0, end: 0 });
   const currentTimeRef = useRef(0);
   const playbackFrameRef = useRef<number | null>(null);
-  const trimDragRef = useRef<{ edge: TrimEdge; pointerId: number } | null>(null);
-  const applyZoomRef = useRef<(nextZoom: number) => void>(() => undefined);
+  const trimDragRef = useRef<{
+    edge: TrimEdge;
+    pointerId: number;
+    clientX: number;
+  } | null>(null);
+  const edgeScrollFrameRef = useRef<number | null>(null);
+  const animateZoomRef = useRef<(nextZoom: number, anchor?: ZoomAnchor) => void>(
+    () => undefined,
+  );
   const togglePlayRef = useRef<() => Promise<void>>(async () => undefined);
 
   const [sample, setSample] = useState<LoadedSample | null>(null);
@@ -104,7 +122,9 @@ function App() {
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [dragEdge, setDragEdge] = useState<TrimEdge | null>(null);
   const [ready, setReady] = useState(false);
+  const [revealed, setRevealed] = useState(!EMBEDDED);
   const [exporting, setExporting] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -249,7 +269,7 @@ function App() {
       renderPlayhead(currentTimeRef.current);
     };
 
-    const applyZoom = (requestedZoom: number) => {
+    const applyZoom = (requestedZoom: number, anchor?: ZoomAnchor) => {
       const waveform = waveformRef.current;
       if (!waveform || duration <= 0 || !wavesurfer.getDecodedData()) return;
 
@@ -257,12 +277,15 @@ function App() {
       const fitPxPerSec = waveform.clientWidth / duration;
       const minPxPerSec = fitPxPerSec * nextZoom;
       const previous = visibleRangeRef.current;
-      const center = previous.end > previous.start
-        ? (previous.start + previous.end) / 2
-        : currentTimeRef.current;
+      const pinned = anchor ?? {
+        time: previous.end > previous.start
+          ? (previous.start + previous.end) / 2
+          : currentTimeRef.current,
+        fraction: 0.5,
+      };
       const visibleDuration = Math.min(duration, waveform.clientWidth / minPxPerSec);
       const start = clamp(
-        center - visibleDuration / 2,
+        pinned.time - pinned.fraction * visibleDuration,
         0,
         Math.max(0, duration - visibleDuration),
       );
@@ -274,7 +297,68 @@ function App() {
       updateVisibleRange(start, Math.min(duration, start + visibleDuration));
     };
 
-    applyZoomRef.current = applyZoom;
+    const anchorAt = (clientX: number): ZoomAnchor | undefined => {
+      const waveform = waveformRef.current;
+      if (!waveform) return undefined;
+
+      const rect = waveform.getBoundingClientRect();
+      if (rect.width <= 0) return undefined;
+
+      const range = visibleRangeRef.current;
+      const fraction = clamp((clientX - rect.left) / rect.width, 0, 1);
+      return { time: range.start + fraction * (range.end - range.start), fraction };
+    };
+
+    // Zooming with no pointer involved keeps the playhead in place when it
+    // is on screen, otherwise the centre of the view.
+    const restingAnchor = (): ZoomAnchor | undefined => {
+      const range = visibleRangeRef.current;
+      const span = range.end - range.start;
+      const time = currentTimeRef.current;
+      if (span <= 0 || time < range.start || time > range.end) return undefined;
+      return { time, fraction: (time - range.start) / span };
+    };
+
+    let pinchFrame = 0;
+    let pinchZoom = 1;
+    let pinchAnchor: ZoomAnchor | undefined;
+    const cancelPinch = () => {
+      if (pinchFrame) window.cancelAnimationFrame(pinchFrame);
+      pinchFrame = 0;
+    };
+
+    let zoomAnimationFrame = 0;
+    const cancelZoomAnimation = () => {
+      if (zoomAnimationFrame) window.cancelAnimationFrame(zoomAnimationFrame);
+      zoomAnimationFrame = 0;
+    };
+
+    // Discrete zoom requests (keys, double click) glide to their target.
+    // Interpolating the scale geometrically keeps the perceived speed even.
+    const animateZoom = (requestedZoom: number, anchor = restingAnchor()) => {
+      cancelZoomAnimation();
+      cancelPinch();
+
+      const from = zoomRef.current;
+      const to = clamp(requestedZoom, 1, MAX_ZOOM_FACTOR);
+      if (REDUCED_MOTION || Math.abs(to - from) < 0.001) {
+        applyZoom(to, anchor);
+        return;
+      }
+
+      const startedAt = performance.now();
+      const step = (now: number) => {
+        const progress = clamp((now - startedAt) / ZOOM_ANIMATION_MS, 0, 1);
+        const eased = 1 - (1 - progress) ** 3;
+        applyZoom(from * (to / from) ** eased, anchor);
+        zoomAnimationFrame = progress < 1 ? window.requestAnimationFrame(step) : 0;
+      };
+
+      zoomAnimationFrame = window.requestAnimationFrame(step);
+    };
+
+    animateZoomRef.current = animateZoom;
+    cleanup.push(cancelZoomAnimation);
 
     cleanup.push(
       wavesurfer.on('scroll', (start, end) => updateVisibleRange(start, end)),
@@ -297,11 +381,29 @@ function App() {
       }),
     );
 
+    // Pinch (ctrl/cmd + wheel) is continuous and follows the fingers: the
+    // time under the pointer stays under the pointer. Events are folded into
+    // one waveform render per frame.
     const handleWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
-        const direction = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-        applyZoom(zoomRef.current * direction);
+        cancelZoomAnimation();
+
+        const pixels = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL
+          ? event.deltaY
+          : event.deltaY * 16;
+        const factor = Math.exp(-clamp(pixels, -30, 30) * PINCH_SENSITIVITY);
+
+        if (!pinchFrame) {
+          pinchZoom = zoomRef.current;
+          pinchAnchor = anchorAt(event.clientX);
+          pinchFrame = window.requestAnimationFrame(() => {
+            pinchFrame = 0;
+            applyZoom(pinchZoom, pinchAnchor);
+          });
+        }
+
+        pinchZoom = clamp(pinchZoom * factor, 1, MAX_ZOOM_FACTOR);
         return;
       }
 
@@ -314,14 +416,44 @@ function App() {
       }
     };
 
-    waveformRef.current.addEventListener('wheel', handleWheel, { passive: false });
-    cleanup.push(() => waveformRef.current?.removeEventListener('wheel', handleWheel));
+    // Double click: into the selection (or the pointer), and back out.
+    const handleDoubleClick = (event: MouseEvent) => {
+      if (zoomRef.current > 1.05) {
+        animateZoom(1, anchorAt(event.clientX));
+        return;
+      }
+
+      const active = selectionRef.current;
+      const span = active.end - active.start;
+      if (span > 0 && span < duration * 0.8) {
+        animateZoom(duration / (span * 1.3), {
+          time: (active.start + active.end) / 2,
+          fraction: 0.5,
+        });
+        return;
+      }
+
+      animateZoom(DOUBLE_CLICK_ZOOM, anchorAt(event.clientX));
+    };
+
+    const waveformElement = waveformRef.current;
+    waveformElement.addEventListener('wheel', handleWheel, { passive: false });
+    waveformElement.addEventListener('dblclick', handleDoubleClick);
+    cleanup.push(() => {
+      cancelPinch();
+      waveformElement.removeEventListener('wheel', handleWheel);
+      waveformElement.removeEventListener('dblclick', handleDoubleClick);
+    });
 
     return () => {
       disposed = true;
       stopPlaybackFrame();
       cleanup.forEach((unsubscribe) => unsubscribe());
-      applyZoomRef.current = () => undefined;
+      animateZoomRef.current = () => undefined;
+      if (edgeScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(edgeScrollFrameRef.current);
+        edgeScrollFrameRef.current = null;
+      }
       trimDragRef.current = null;
       waveSurferRef.current = null;
       playbackRef.current = null;
@@ -363,8 +495,43 @@ function App() {
 
   useEffect(() => {
     if (!ready) return;
-    window.parent.postMessage({ type: 'tab-sampler:ready' }, '*');
+
+    // Announce readiness only after the finished editor has actually been
+    // painted and rasterized. The island starts its morph on this message,
+    // so none of the first-render cost can land inside the animation.
+    let announced = false;
+    const announce = () => {
+      if (announced) return;
+      announced = true;
+      window.parent.postMessage({ type: 'tab-sampler:ready' }, '*');
+    };
+
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(announce);
+    });
+    // Frames can be throttled while the editor is still hidden inside the
+    // island; never let that strand the expansion.
+    const fallback = window.setTimeout(announce, 160);
+
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.cancelAnimationFrame(second);
+      window.clearTimeout(fallback);
+    };
   }, [ready]);
+
+  useEffect(() => {
+    if (!EMBEDDED) return;
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
+      if (event.data?.type === 'tab-sampler:reveal') setRevealed(true);
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -373,10 +540,10 @@ function App() {
         void togglePlayRef.current();
       } else if ((event.key === '+' || event.key === '=') && ready) {
         event.preventDefault();
-        applyZoomRef.current(zoomRef.current * ZOOM_STEP);
+        animateZoomRef.current(zoomRef.current * ZOOM_STEP);
       } else if (event.key === '-' && ready) {
         event.preventDefault();
-        applyZoomRef.current(zoomRef.current / ZOOM_STEP);
+        animateZoomRef.current(zoomRef.current / ZOOM_STEP);
       }
     };
 
@@ -399,18 +566,9 @@ function App() {
     }
   };
 
-  const trimAtPointer = (edge: TrimEdge, clientX: number) => {
-    if (!sample || !waveformRef.current) return;
+  const moveEdge = (edge: TrimEdge, time: number) => {
+    if (!sample) return;
 
-    const rect = waveformRef.current.getBoundingClientRect();
-    if (rect.width <= 0) return;
-
-    const range = visibleRangeRef.current;
-    const span = range.end - range.start;
-    if (span <= 0) return;
-
-    const localProgress = clamp((clientX - rect.left) / rect.width, 0, 1);
-    const time = range.start + localProgress * span;
     const next = moveSelectionEdge(
       selectionRef.current,
       edge,
@@ -425,20 +583,90 @@ function App() {
     renderPlayhead(playbackRef.current?.getCurrentTime() ?? next.start);
   };
 
+  const trimAtPointer = (edge: TrimEdge, clientX: number) => {
+    if (!waveformRef.current) return;
+
+    const rect = waveformRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    const range = visibleRangeRef.current;
+    const span = range.end - range.start;
+    if (span <= 0) return;
+
+    const localProgress = clamp((clientX - rect.left) / rect.width, 0, 1);
+    moveEdge(edge, range.start + localProgress * span);
+  };
+
+  const stopEdgeScroll = () => {
+    if (edgeScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(edgeScrollFrameRef.current);
+      edgeScrollFrameRef.current = null;
+    }
+  };
+
+  // While zoomed in, holding a handle against either end of the view scrolls
+  // the waveform under it, so a trim can reach audio that is off screen.
+  const startEdgeScroll = () => {
+    stopEdgeScroll();
+
+    const tick = () => {
+      const active = trimDragRef.current;
+      const waveform = waveformRef.current;
+      const wavesurfer = waveSurferRef.current;
+      if (!active || !waveform || !wavesurfer) {
+        edgeScrollFrameRef.current = null;
+        return;
+      }
+
+      if (zoomRef.current > 1) {
+        const rect = waveform.getBoundingClientRect();
+        const fromLeft = active.clientX - rect.left;
+        const fromRight = rect.right - active.clientX;
+        const push = fromLeft < EDGE_SCROLL_ZONE
+          ? -(1 - Math.max(0, fromLeft) / EDGE_SCROLL_ZONE)
+          : fromRight < EDGE_SCROLL_ZONE
+            ? 1 - Math.max(0, fromRight) / EDGE_SCROLL_ZONE
+            : 0;
+
+        if (push !== 0) {
+          wavesurfer.setScroll(wavesurfer.getScroll() + push * EDGE_SCROLL_SPEED);
+          trimAtPointer(active.edge, active.clientX);
+        }
+      }
+
+      edgeScrollFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    edgeScrollFrameRef.current = window.requestAnimationFrame(tick);
+  };
+
   const beginTrim = (edge: TrimEdge, event: React.PointerEvent<HTMLDivElement>) => {
     if (!ready) return;
     event.preventDefault();
     event.stopPropagation();
-    trimDragRef.current = { edge, pointerId: event.pointerId };
+    trimDragRef.current = { edge, pointerId: event.pointerId, clientX: event.clientX };
     event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.focus({ preventScroll: true });
+    setDragEdge(edge);
     trimAtPointer(edge, event.clientX);
+    startEdgeScroll();
   };
 
   const continueTrim = (event: React.PointerEvent<HTMLDivElement>) => {
     const active = trimDragRef.current;
     if (!active || active.pointerId !== event.pointerId) return;
     event.preventDefault();
+    active.clientX = event.clientX;
     trimAtPointer(active.edge, event.clientX);
+  };
+
+  const commitTrim = () => {
+    const playback = playbackRef.current;
+    if (!playback) return;
+    void playback.restartInsideSelection().then(() => {
+      renderPlayhead(playback.getCurrentTime());
+      if (playback.isPlaying()) startPlaybackFrame();
+    });
   };
 
   const endTrim = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -446,17 +674,26 @@ function App() {
     if (!active || active.pointerId !== event.pointerId) return;
     event.preventDefault();
     trimDragRef.current = null;
+    stopEdgeScroll();
+    setDragEdge(null);
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    const playback = playbackRef.current;
-    if (!playback) return;
-    void playback.restartInsideSelection().then(() => {
-      renderPlayhead(playback.getCurrentTime());
-      if (playback.isPlaying()) startPlaybackFrame();
-    });
+    commitTrim();
+  };
+
+  // Arrow keys nudge a focused handle for precise trims.
+  const nudgeTrim = (edge: TrimEdge, event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!ready) return;
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+
+    const step = NUDGE_SECONDS * (event.shiftKey ? 10 : 1);
+    const direction = event.key === 'ArrowLeft' ? -1 : 1;
+    moveEdge(edge, selectionRef.current[edge] + direction * step);
+    commitTrim();
   };
 
   const newCapture = async () => {
@@ -470,11 +707,6 @@ function App() {
       if (DEMO_MODE) {
         window.parent.postMessage({ type: 'tab-sampler:demo-reset' }, '*');
         setDiscarding(false);
-        return;
-      }
-
-      if (DEMO_MODE) {
-        setExporting(false);
         return;
       }
 
@@ -536,60 +768,63 @@ function App() {
     : 100;
   const startBoundaryVisible = selection.start >= visibleRange.start && selection.start <= visibleRange.end;
   const endBoundaryVisible = selection.end >= visibleRange.start && selection.end <= visibleRange.end;
+  const zoomed = zoom > 1.001;
 
   return (
-    <main className={`editor ${ready ? 'is-ready' : ''}`}>
-      <section className="wave-shell" aria-label="Captured audio waveform">
+    <main
+      className={`editor ${ready ? 'is-ready' : ''} ${revealed ? 'is-revealed' : ''}`}
+    >
+      <section
+        className={`wave-shell ${zoomed ? 'is-zoomed' : ''}`}
+        aria-label="Captured audio waveform"
+        style={{
+          '--trim-start': `${startPercent}%`,
+          '--trim-end': `${endPercent}%`,
+        } as React.CSSProperties}
+      >
         <span className="record-seed" aria-hidden="true" />
         <div ref={waveformRef} className="waveform" />
-        <div
-          className="trim-mask trim-mask--left"
-          style={{ width: `${startPercent}%` }}
-          aria-hidden="true"
-        />
-        <div
-          className="trim-mask trim-mask--right"
-          style={{ left: `${endPercent}%`, width: `${100 - endPercent}%` }}
-          aria-hidden="true"
-        />
-        {startBoundaryVisible && (
-          <div
-            className="trim-boundary"
-            style={{ left: `${startPercent}%` }}
-            role="slider"
-            aria-label="Trim start"
-            aria-valuemin={0}
-            aria-valuemax={selection.end}
-            aria-valuenow={selection.start}
-            onPointerDown={(event) => beginTrim('start', event)}
-            onPointerMove={continueTrim}
-            onPointerUp={endTrim}
-            onPointerCancel={endTrim}
-          >
-            <span className="trim-boundary__line" />
-            <span className="trim-boundary__grip" />
-          </div>
-        )}
-        {endBoundaryVisible && (
-          <div
-            className="trim-boundary"
-            style={{ left: `${endPercent}%` }}
-            role="slider"
-            aria-label="Trim end"
-            aria-valuemin={selection.start}
-            aria-valuemax={sample.meta.duration}
-            aria-valuenow={selection.end}
-            onPointerDown={(event) => beginTrim('end', event)}
-            onPointerMove={continueTrim}
-            onPointerUp={endTrim}
-            onPointerCancel={endTrim}
-          >
-            <span className="trim-boundary__line" />
-            <span className="trim-boundary__grip" />
-          </div>
-        )}
+        {(['start', 'end'] as const).map((edge) => {
+          const visible = edge === 'start' ? startBoundaryVisible : endBoundaryVisible;
+          if (!visible) return null;
+
+          return (
+            <div
+              key={edge}
+              className={`trim-boundary trim-boundary--${edge} ${dragEdge === edge ? 'is-dragging' : ''}`}
+              style={{ left: `${edge === 'start' ? startPercent : endPercent}%` }}
+              role="slider"
+              tabIndex={0}
+              aria-label={edge === 'start' ? 'Trim start' : 'Trim end'}
+              aria-valuemin={edge === 'start' ? 0 : selection.start}
+              aria-valuemax={edge === 'start' ? selection.end : sample.meta.duration}
+              aria-valuenow={selection[edge]}
+              aria-valuetext={formatReferenceTime(selection[edge])}
+              onPointerDown={(event) => beginTrim(edge, event)}
+              onPointerMove={continueTrim}
+              onPointerUp={endTrim}
+              onPointerCancel={endTrim}
+              onKeyDown={(event) => nudgeTrim(edge, event)}
+            >
+              <span className="trim-boundary__line" />
+              <span className="trim-boundary__grip" />
+              <span className="trim-boundary__time" aria-hidden="true">
+                {formatReferenceTime(selection[edge])}
+              </span>
+            </div>
+          );
+        })}
         <div ref={playheadRef} className="playhead" aria-hidden="true">
           <span className="playhead__cap" />
+        </div>
+        <div className="zoom-range" aria-hidden="true">
+          <span
+            className="zoom-range__thumb"
+            style={{
+              left: `${(visibleRange.start / sample.meta.duration) * 100}%`,
+              width: `${(visibleSpan / sample.meta.duration) * 100}%`,
+            }}
+          />
         </div>
       </section>
 
@@ -602,7 +837,7 @@ function App() {
           aria-label="New capture"
           title="New capture"
         >
-          <SystemIcon name="plus" size={14} strokeWidth={1.9} />
+          <SystemIcon name="plus" size={15} strokeWidth={2.2} />
         </button>
         <button
           type="button"
@@ -612,7 +847,7 @@ function App() {
           aria-label="Export WAV"
           title="Export WAV"
         >
-          <SystemIcon name="download" size={14} strokeWidth={1.9} />
+          <SystemIcon name="download" size={15} strokeWidth={2.2} />
         </button>
       </div>
 
@@ -636,7 +871,7 @@ function App() {
           aria-label="Loop selection"
           title="Loop selection"
         >
-          <SystemIcon name="rotateCcw" size={22} strokeWidth={1.75} />
+          <SystemIcon name="repeat" size={22} strokeWidth={2} />
         </button>
 
         <button
@@ -647,7 +882,7 @@ function App() {
           aria-label={playing ? 'Pause' : 'Play selection'}
           title={playing ? 'Pause' : 'Play selection'}
         >
-          <MorphIcon name={playing ? 'pause' : 'play'} size={22} />
+          <PlayPauseIcon playing={playing} size={28} />
         </button>
       </footer>
     </main>
