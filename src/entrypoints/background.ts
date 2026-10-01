@@ -13,6 +13,7 @@ const OFFSCREEN_URL = 'offscreen.html';
 const EDITOR_URL = 'editor.html';
 const OVERLAY_HOST_ID = '__tab_sampler_overlay__';
 let busy = false;
+let recordingTabId: number | null = null;
 
 
 async function openEditorOverlay(tabId: number): Promise<void> {
@@ -58,22 +59,23 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           position: absolute;
           top: 16px;
           right: 16px;
-          width: 64px;
-          height: 30px;
+          width: 352px;
+          height: 336px;
           overflow: hidden;
           pointer-events: auto;
-          border-radius: 18px;
+          border-radius: 48px;
           corner-shape: squircle;
           isolation: isolate;
 
           background:
-            radial-gradient(110% 120% at 24% -20%,
-              rgba(255,255,255,.09) 0%,
-              rgba(255,255,255,.018) 34%,
-              transparent 64%),
+            radial-gradient(120% 88% at 18% -4%,
+              rgba(255,255,255,.085) 0%,
+              rgba(255,255,255,.018) 28%,
+              transparent 58%),
             linear-gradient(180deg,
-              rgba(25,25,28,.78) 0%,
-              rgba(15,15,18,.80) 100%);
+              rgba(24,24,27,.66) 0%,
+              rgba(18,18,21,.63) 48%,
+              rgba(11,11,14,.74) 100%);
 
           -webkit-backdrop-filter:
             blur(42px)
@@ -87,53 +89,23 @@ async function openEditorOverlay(tabId: number): Promise<void> {
             contrast(104%);
 
           box-shadow:
-            0 10px 28px rgba(0,0,0,.28),
-            0 1px 0 rgba(255,255,255,.16) inset,
-            0 0 0 1px rgba(255,255,255,.035) inset;
-
-          transform-origin: 100% 0%;
-          transform: translate3d(0,0,0);
-          will-change: width, height, border-radius, box-shadow;
-          transition:
-            width 420ms cubic-bezier(.16,1,.3,1),
-            height 420ms cubic-bezier(.16,1,.3,1),
-            border-radius 420ms cubic-bezier(.16,1,.3,1),
-            box-shadow 360ms cubic-bezier(.16,1,.3,1);
-        }
-
-        .glass.is-open {
-          width: 352px;
-          height: 336px;
-          border-radius: 48px;
-          box-shadow:
             0 26px 64px rgba(0,0,0,.36),
             0 8px 22px rgba(0,0,0,.20),
             0 1px 0 rgba(255,255,255,.18) inset,
             0 0 0 1px rgba(255,255,255,.035) inset,
             0 -1px 0 rgba(0,0,0,.28) inset;
-        }
 
-        .island-seed {
-          position: absolute;
-          z-index: 4;
-          top: 50%;
-          left: 50%;
-          width: 7px;
-          height: 7px;
-          margin: -3.5px 0 0 -3.5px;
-          border-radius: 999px;
-          background: #ff3b30;
-          box-shadow: 0 0 10px rgba(255,59,48,.44);
-          opacity: 1;
-          transform: scale(1);
-          transition:
-            opacity 130ms ease 90ms,
-            transform 180ms cubic-bezier(.2,.8,.2,1) 80ms;
-        }
-
-        .glass.is-open .island-seed {
           opacity: 0;
-          transform: scale(.72);
+          transform: translateY(-4px) scale(.988);
+          transform-origin: 100% 0%;
+          transition:
+            opacity 180ms ease,
+            transform 220ms cubic-bezier(.2,.8,.2,1);
+        }
+
+        .glass.is-ready {
+          opacity: 1;
+          transform: translateY(0) scale(1);
         }
 
         .glass::before {
@@ -169,10 +141,8 @@ async function openEditorOverlay(tabId: number): Promise<void> {
         }
 
         iframe {
-          position: absolute;
+          position: relative;
           z-index: 1;
-          top: 0;
-          right: 0;
           display: block;
           width: 352px;
           height: 336px;
@@ -180,37 +150,28 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           background: transparent;
           color-scheme: dark;
           opacity: 0;
-          transform: translate3d(0,0,0);
           pointer-events: none;
-          transition: opacity 150ms ease 120ms;
+          transition: opacity 100ms ease;
         }
 
-        .glass.is-open iframe {
+        .glass.is-ready iframe {
           opacity: 1;
           pointer-events: auto;
         }
 
         .glass.is-closing {
-          width: 64px;
-          height: 30px;
-          border-radius: 18px;
-          box-shadow:
-            0 10px 28px rgba(0,0,0,.22),
-            0 1px 0 rgba(255,255,255,.12) inset,
-            0 0 0 1px rgba(255,255,255,.025) inset;
-          transition-duration: 260ms;
+          opacity: 0;
+          transform: translateY(-4px) scale(.988);
+          transition-duration: 120ms;
         }
 
         .glass.is-closing iframe {
           opacity: 0;
           pointer-events: none;
-          transition-delay: 0ms;
-          transition-duration: 80ms;
         }
 
         @media (prefers-reduced-motion: reduce) {
           .glass,
-          .island-seed,
           iframe {
             transition-duration: 1ms !important;
             transition-delay: 0ms !important;
@@ -225,16 +186,13 @@ async function openEditorOverlay(tabId: number): Promise<void> {
       const glass = document.createElement('div');
       glass.className = 'glass';
 
-      const seed = document.createElement('span');
-      seed.className = 'island-seed';
-
       const frame = document.createElement('iframe');
       frame.src = src;
       frame.title = 'Tab Sampler editor';
       frame.allow = 'autoplay';
       frame.setAttribute('aria-label', 'Tab Sampler audio editor');
 
-      glass.append(seed, frame);
+      glass.append(frame);
       stage.append(glass);
       shadow.append(style, stage);
       document.documentElement.append(host);
@@ -243,7 +201,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
       const close = () => {
         if (closed) return;
         closed = true;
-        glass.classList.remove('is-open');
+        glass.classList.remove('is-ready');
         glass.classList.add('is-closing');
         window.setTimeout(() => {
           host.remove();
@@ -253,7 +211,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           if (pageWindow.__tabSamplerOverlayCleanup === cleanup) {
             delete pageWindow.__tabSamplerOverlayCleanup;
           }
-        }, 280);
+        }, 140);
       };
 
       const cleanup = () => {
@@ -278,7 +236,7 @@ async function openEditorOverlay(tabId: number): Promise<void> {
         if (event.data?.type === 'tab-sampler:ready') {
           window.requestAnimationFrame(() => {
             glass.classList.remove('is-closing');
-            glass.classList.add('is-open');
+            glass.classList.add('is-ready');
           });
           return;
         }
@@ -333,7 +291,7 @@ async function restoreActionState(): Promise<void> {
   const status = await captureStatus();
   if (status === 'recording' || status === 'starting' || status === 'stopping') {
     await browser.action.setPopup({ popup: '' });
-    await setRecordingAction();
+    await setRecordingAction(recordingTabId ?? undefined);
     return;
   }
 
@@ -348,7 +306,7 @@ async function restoreActionState(): Promise<void> {
   await setIdleAction();
 }
 
-async function startCapture(): Promise<void> {
+async function startCapture(tabId: number): Promise<void> {
   await browser.action.setPopup({ popup: '' });
   await ensureOffscreen();
 
@@ -357,10 +315,12 @@ async function startCapture(): Promise<void> {
     // current active tab without requiring the broader `activeTab` permission.
     const streamId = await browser.tabCapture.getMediaStreamId();
     await sendMessage('offscreen:start', { streamId });
-    await setRecordingAction();
+    recordingTabId = tabId;
+    await setRecordingAction(tabId);
   } catch (error) {
     await closeOffscreen();
-    await setIdleAction();
+    recordingTabId = null;
+    await setIdleAction(tabId);
     throw error;
   }
 }
@@ -380,7 +340,8 @@ async function stopCaptureAndOpenEditor(tabId: number): Promise<void> {
   }
 
   await browser.action.setPopup({ popup: '' });
-  await setEditingAction();
+  recordingTabId = null;
+  await setEditingAction(tabId);
   await openEditorOverlay(tabId);
 }
 
@@ -404,7 +365,7 @@ export default defineBackground(() => {
           await setEditingAction();
           await openEditorOverlay(tabId);
         } else {
-          await startCapture();
+          await startCapture(tabId);
         }
       }
     } catch (error) {
@@ -416,12 +377,17 @@ export default defineBackground(() => {
   });
 
   onMessage('background:pulse', async (message) => {
-    await setRecordingPulse(message.data.bright);
+    await setRecordingPulse(
+      message.data.bright,
+      recordingTabId ?? undefined,
+    );
   });
 
   onMessage('background:reset', async () => {
     await browser.action.setPopup({ popup: '' });
-    await setIdleAction();
+    const tabId = recordingTabId ?? undefined;
+    recordingTabId = null;
+    await setIdleAction(tabId);
   });
 
   onMessage('background:capture-ended', async () => {
