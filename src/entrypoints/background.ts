@@ -67,34 +67,35 @@ async function openEditorOverlay(tabId: number): Promise<void> {
           isolation: isolate;
 
           background:
-            radial-gradient(120% 95% at 18% 0%,
-              rgba(255,255,255,.105) 0%,
-              rgba(255,255,255,.028) 32%,
-              transparent 62%),
+            radial-gradient(120% 88% at 18% -4%,
+              rgba(255,255,255,.085) 0%,
+              rgba(255,255,255,.018) 28%,
+              transparent 58%),
             linear-gradient(180deg,
-              rgba(29,29,31,.72) 0%,
-              rgba(20,20,22,.70) 48%,
-              rgba(13,13,15,.80) 100%);
+              rgba(24,24,27,.66) 0%,
+              rgba(18,18,21,.63) 48%,
+              rgba(11,11,14,.74) 100%);
 
           -webkit-backdrop-filter:
-            blur(34px)
-            saturate(180%)
-            contrast(108%);
+            blur(42px)
+            saturate(165%)
+            brightness(88%)
+            contrast(104%);
           backdrop-filter:
-            blur(34px)
-            saturate(180%)
-            contrast(108%);
+            blur(42px)
+            saturate(165%)
+            brightness(88%)
+            contrast(104%);
 
           box-shadow:
-            0 32px 70px rgba(0,0,0,.42),
-            0 10px 24px rgba(0,0,0,.24),
-            0 1px 0 rgba(255,255,255,.22) inset,
-            1px 0 0 rgba(255,255,255,.055) inset,
-            -1px 0 0 rgba(0,0,0,.26) inset,
-            0 -1px 0 rgba(0,0,0,.42) inset;
+            0 26px 64px rgba(0,0,0,.36),
+            0 8px 22px rgba(0,0,0,.20),
+            0 1px 0 rgba(255,255,255,.18) inset,
+            0 0 0 1px rgba(255,255,255,.035) inset,
+            0 -1px 0 rgba(0,0,0,.28) inset;
 
-          transform-origin: 92% 0%;
-          animation: glass-enter 260ms cubic-bezier(.16,1,.3,1) both;
+          transform-origin: 94% 0%;
+          animation: glass-enter 360ms both;
         }
 
         .glass::before {
@@ -147,22 +148,29 @@ async function openEditorOverlay(tabId: number): Promise<void> {
         @keyframes glass-enter {
           0% {
             opacity: 0;
-            transform: translateY(-8px) scale(.965);
-            filter: blur(7px);
+            transform: translateY(-12px) scale(.94);
           }
-          58% { filter: blur(0); }
+          58% {
+            opacity: 1;
+            transform: translateY(1px) scale(1.006);
+          }
+          78% {
+            transform: translateY(0) scale(.998);
+          }
           100% {
             opacity: 1;
             transform: translateY(0) scale(1);
-            filter: blur(0);
           }
         }
 
         @keyframes glass-exit {
-          to {
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+          100% {
             opacity: 0;
-            transform: translateY(-5px) scale(.98);
-            filter: blur(3px);
+            transform: translateY(-8px) scale(.975);
           }
         }
 
