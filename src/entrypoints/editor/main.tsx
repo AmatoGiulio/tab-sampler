@@ -319,6 +319,11 @@ function App() {
   togglePlayRef.current = togglePlay;
 
   useEffect(() => {
+    if (!ready) return;
+    window.parent.postMessage({ type: 'tab-sampler:ready' }, '*');
+  }, [ready]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === ' ' && ready) {
         event.preventDefault();
