@@ -7,7 +7,13 @@ export default defineConfig({
     name: 'Tab Sampler',
     description: 'Click, listen, click, trim, loop, export.',
     minimum_chrome_version: '127',
-    permissions: ['tabCapture', 'offscreen'],
+    permissions: ['tabCapture', 'offscreen', 'activeTab', 'scripting'],
+    web_accessible_resources: [
+      {
+        resources: ['editor.html'],
+        matches: ['<all_urls>'],
+      },
+    ],
     action: {
       default_title: 'Click to capture tab audio',
       default_icon: {
