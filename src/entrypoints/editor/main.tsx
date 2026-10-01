@@ -32,6 +32,19 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function formatReferenceTime(seconds: number): string {
+  const safe = Math.max(0, seconds);
+  const wholeMinutes = Math.floor(safe / 60);
+  const wholeSeconds = Math.floor(safe % 60);
+  const centiseconds = Math.floor((safe - Math.floor(safe)) * 100);
+
+  return [
+    String(wholeMinutes).padStart(2, '0'),
+    String(wholeSeconds).padStart(2, '0'),
+    String(centiseconds).padStart(2, '0'),
+  ].join(':');
+}
+
 function App() {
   const waveformRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -154,18 +167,18 @@ function App() {
       container: waveformRef.current,
       peaks: sample.channelData,
       duration,
-      height: 118,
+      height: 168,
       waveColor: 'rgba(255,255,255,0.72)',
       progressColor: 'rgba(255,255,255,0.72)',
       cursorWidth: 0,
-      barWidth: 2,
+      barWidth: 3,
       barGap: 2,
       barRadius: 2,
       dragToSeek: { debounceTime: 0 },
       hideScrollbar: true,
       autoScroll: false,
       autoCenter: false,
-      normalize: false,
+      normalize: true,
       interact: true,
       fillParent: true,
     });
@@ -550,7 +563,7 @@ function App() {
             <span>SAVED</span>
           </div>
           <div className="sample-time">
-            {formatSeconds(selectionDuration(selection))}
+            {formatReferenceTime(selectionDuration(selection))}
           </div>
         </div>
 
