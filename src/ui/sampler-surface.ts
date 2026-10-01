@@ -77,12 +77,13 @@ export function mountSamplerSurfaceDom(
         0 -1px 0 rgba(0,0,0,.24) inset;
       transform-origin: 100% 0%;
       transform: translate3d(0,0,0);
-      will-change: width, height, border-radius, box-shadow;
+      backface-visibility: hidden;
+      contain: layout paint;
+      will-change: width, height, border-radius;
       transition:
         width 390ms cubic-bezier(.16,1,.3,1),
         height 390ms cubic-bezier(.16,1,.3,1),
         border-radius 390ms cubic-bezier(.16,1,.3,1),
-        box-shadow 360ms cubic-bezier(.16,1,.3,1),
         opacity 150ms ease,
         transform 180ms ease;
     }
@@ -375,6 +376,9 @@ export function mountSamplerSurfaceDom(
   let demoMeterTimer = 0;
   let demoResetTimer = 0;
   let demoUnloadTimer = 0;
+  let editorReady = false;
+  let expandRequested = false;
+  let editorLoadStarted = false;
 
   const resizeCanvas = () => {
     const rect = canvas.getBoundingClientRect();
@@ -451,10 +455,29 @@ export function mountSamplerSurfaceDom(
     surface.classList.add('is-frozen');
   };
 
+  const revealEditor = () => {
+    if (!expandRequested || !editorReady) return;
+
+    window.requestAnimationFrame(() => {
+      if (closed) return;
+
+      // Reveal the already-rendered editor in the exact frame in which
+      // geometry starts expanding. This avoids the empty/black shell phase.
+      surface.classList.add('is-expanded', 'is-editor-ready');
+    });
+  };
+
+  const prepareEditor = () => {
+    if (editorLoadStarted) return;
+    editorLoadStarted = true;
+    frame.src = src;
+  };
+
   const expand = () => {
     freeze();
-    surface.classList.add('is-expanded');
-    frame.src = src;
+    expandRequested = true;
+    prepareEditor();
+    revealEditor();
   };
 
   const resetShowcase = () => {
@@ -476,6 +499,10 @@ export function mountSamplerSurfaceDom(
       smoothedPeak = .04;
       peaks.fill(.04);
       drawWave();
+
+      editorReady = false;
+      expandRequested = false;
+      editorLoadStarted = false;
     }, 90);
 
     // Unload only after both the editor fade and the island collapse are done.
@@ -544,7 +571,8 @@ export function mountSamplerSurfaceDom(
     if (event.source !== frame.contentWindow) return;
 
     if (event.data?.type === 'tab-sampler:ready') {
-      surface.classList.add('is-editor-ready');
+      editorReady = true;
+      revealEditor();
       return;
     }
 
@@ -630,9 +658,10 @@ export function mountSamplerSurfaceDom(
   renderTimer();
 
   if (mode === 'editor') {
-    surface.classList.add('is-live', 'is-frozen', 'is-expanded');
+    surface.classList.add('is-live', 'is-frozen');
     frozenAt = performance.now();
-    frame.src = src;
+    expandRequested = true;
+    prepareEditor();
   } else {
     window.requestAnimationFrame(() => {
       surface.classList.add('is-live');
