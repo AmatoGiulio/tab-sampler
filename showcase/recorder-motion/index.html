@@ -93,11 +93,13 @@
 
       const stage = host.shadowRoot.querySelector('.stage');
       const surface = host.shadowRoot.querySelector('.surface');
-      const morphShell = host.shadowRoot.querySelector('.morph-shell');
+      const morphShell = host.shadowRoot.querySelector('.morph-shell--source');
+      const morphDestination = host.shadowRoot.querySelector('.morph-shell--destination');
       if (
         !(stage instanceof HTMLElement) ||
         !(surface instanceof HTMLElement) ||
-        !(morphShell instanceof HTMLElement)
+        !(morphShell instanceof HTMLElement) ||
+        !(morphDestination instanceof HTMLElement)
       ) return;
 
       stage.style.inset = '50% auto auto 50%';
@@ -109,6 +111,8 @@
       surface.style.right = '0';
       morphShell.style.top = '0';
       morphShell.style.right = '0';
+      morphDestination.style.top = '0';
+      morphDestination.style.right = '0';
     });
   </script>
 </body>
