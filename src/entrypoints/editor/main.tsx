@@ -20,6 +20,44 @@ const EMPTY_SELECTION: Selection = { start: 0, end: 0 };
 const MAX_ZOOM_FACTOR = 24;
 const ZOOM_STEP = 1.55;
 const MIN_SELECTION_SECONDS = 0.025;
+const DEMO_MODE = new URLSearchParams(window.location.search).get('demo') === '1';
+
+function createDemoSample(): LoadedSample {
+  const sampleRate = 48_000;
+  const duration = 3.24;
+  const frames = Math.floor(sampleRate * duration);
+  const channel = new Float32Array(frames);
+
+  for (let index = 0; index < frames; index += 1) {
+    const t = index / sampleRate;
+    const pulse =
+      0.42 +
+      0.34 * Math.sin(t * 2.8) ** 2 +
+      0.22 * Math.sin(t * 7.7 + 0.6) ** 2;
+    const envelope = Math.min(1, index / 1400) * Math.min(1, (frames - index) / 1800);
+    channel[index] =
+      envelope *
+      pulse *
+      (
+        Math.sin(Math.PI * 2 * 91 * t) * 0.45 +
+        Math.sin(Math.PI * 2 * 173 * t + 0.4) * 0.25 +
+        Math.sin(Math.PI * 2 * 257 * t + 1.1) * 0.12
+      );
+  }
+
+  return {
+    meta: {
+      id: 'tab-sampler-showcase',
+      createdAt: Date.now(),
+      sampleRate,
+      channels: 1,
+      frames,
+      duration,
+      chunkCount: 1,
+    },
+    channelData: [channel],
+  };
+}
 
 type TrimEdge = 'start' | 'end';
 
@@ -139,6 +177,11 @@ function App() {
 
     void (async () => {
       try {
+        if (DEMO_MODE) {
+          if (!cancelled) setSample(createDemoSample());
+          return;
+        }
+
         const meta = await getLatestSampleMeta();
         if (!meta) throw new Error('No captured sample found');
         const loaded = await loadSample(meta.id);
@@ -423,6 +466,18 @@ function App() {
     try {
       playbackRef.current?.pause();
       stopPlaybackFrame();
+
+      if (DEMO_MODE) {
+        window.parent.postMessage({ type: 'tab-sampler:demo-reset' }, '*');
+        setDiscarding(false);
+        return;
+      }
+
+      if (DEMO_MODE) {
+        setExporting(false);
+        return;
+      }
+
       await deleteSample(sample.meta.id);
       await sendMessage('background:reset', { sampleId: sample.meta.id });
       window.parent.postMessage({ type: 'tab-sampler:close' }, '*');
