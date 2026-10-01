@@ -6,6 +6,7 @@ interface ProtocolMap {
   'offscreen:stop'(data: null): SampleMeta;
   'offscreen:status'(data: null): { status: CaptureStatus };
   'background:pulse'(data: { bright: boolean }): void;
+  'background:meter'(data: { peak: number; rms: number }): void;
   'background:reset'(data: { sampleId?: string }): void;
   'background:capture-ended'(data: { reason: string; sampleId: string }): void;
 }
