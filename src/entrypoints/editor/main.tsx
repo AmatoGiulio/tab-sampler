@@ -420,7 +420,7 @@ function App() {
       stopPlaybackFrame();
       await deleteSample(sample.meta.id);
       await sendMessage('background:reset', { sampleId: sample.meta.id });
-      window.setTimeout(() => window.close(), 50);
+      window.parent.postMessage({ type: 'tab-sampler:close' }, '*');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to discard sample');
       setDiscarding(false);
@@ -448,7 +448,7 @@ function App() {
 
       await deleteSample(sample.meta.id);
       await sendMessage('background:reset', { sampleId: sample.meta.id });
-      window.setTimeout(() => window.close(), 80);
+      window.parent.postMessage({ type: 'tab-sampler:close' }, '*');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Export failed');
       setExporting(false);
