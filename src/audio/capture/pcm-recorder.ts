@@ -11,7 +11,16 @@ interface WorkletFlushedMessage {
   type: 'flushed';
 }
 
-type WorkletMessage = WorkletChunkMessage | WorkletFlushedMessage;
+interface WorkletMeterMessage {
+  type: 'meter';
+  peak: number;
+  rms: number;
+}
+
+type WorkletMessage =
+  | WorkletChunkMessage
+  | WorkletFlushedMessage
+  | WorkletMeterMessage;
 
 export class PcmRecorder {
   constructor(private readonly sink: SampleSink) {}
@@ -27,6 +36,7 @@ export class PcmRecorder {
   private writeChain: Promise<void> = Promise.resolve();
   private flushResolve: (() => void) | null = null;
   private unexpectedEndHandler: ((meta: SampleMeta) => void) | null = null;
+  private meterHandler: ((meter: { peak: number; rms: number }) => void) | null = null;
 
   getStatus(): CaptureStatus {
     return this.status;
@@ -34,6 +44,10 @@ export class PcmRecorder {
 
   onUnexpectedEnd(handler: (meta: SampleMeta) => void): void {
     this.unexpectedEndHandler = handler;
+  }
+
+  onMeter(handler: (meter: { peak: number; rms: number }) => void): void {
+    this.meterHandler = handler;
   }
 
   async start(stream: MediaStream, workletUrl: string): Promise<SampleMeta> {
@@ -85,6 +99,10 @@ export class PcmRecorder {
         const message = event.data;
         if (message.type === 'chunk') {
           this.handleChunk(message);
+          return;
+        }
+        if (message.type === 'meter') {
+          this.meterHandler?.({ peak: message.peak, rms: message.rms });
           return;
         }
         this.flushResolve?.();
