@@ -31,21 +31,20 @@ export function mountSamplerSurfaceDom(
   style.textContent = `
     :host {
       all: initial;
-      --material-spring: linear(
+      --geometry-spring: linear(
         0,
         .018,
         .066,
         .154,
         .286,
-        .449,
-        .618,
-        .766,
-        .881,
-        .956,
-        1.003,
-        1.026,
-        1.022,
+        .446,
+        .612,
+        .758,
+        .872,
+        .946,
+        .990,
         1.012,
+        1.010,
         1.004,
         1
       );
@@ -58,49 +57,52 @@ export function mountSamplerSurfaceDom(
     }
 
     .surface {
-      --light-x: 24%;
-      --light-y: 2%;
-
       position: absolute;
       top: 16px;
       right: 16px;
-      width: 352px;
-      height: 336px;
+      width: 44px;
+      height: 44px;
       overflow: hidden;
       pointer-events: none;
-      border-radius: 48px;
+      border-radius: 22px;
       corner-shape: squircle;
       isolation: isolate;
-
-      clip-path: inset(0 0 292px 308px round 22px);
-
-      background: rgba(17, 17, 20, .58);
+      background:
+        radial-gradient(
+          120% 140% at 22% -28%,
+          rgba(255,255,255,.105) 0%,
+          rgba(255,255,255,.018) 34%,
+          transparent 62%
+        ),
+        linear-gradient(
+          180deg,
+          rgba(24,24,27,.88) 0%,
+          rgba(12,12,15,.91) 100%
+        );
       -webkit-backdrop-filter:
-        blur(30px)
-        saturate(155%)
-        brightness(78%)
-        contrast(108%);
+        blur(34px)
+        saturate(165%)
+        brightness(88%)
+        contrast(104%);
       backdrop-filter:
-        blur(30px)
-        saturate(155%)
-        brightness(78%)
-        contrast(108%);
-
+        blur(34px)
+        saturate(165%)
+        brightness(88%)
+        contrast(104%);
       box-shadow:
-        0 18px 46px rgba(0, 0, 0, .23),
-        0 1px 0 rgba(255, 255, 255, .15) inset,
-        0 0 0 .5px rgba(255, 255, 255, .065) inset;
-
+        0 12px 34px rgba(0,0,0,.29),
+        0 1px 0 rgba(255,255,255,.17) inset,
+        0 0 0 1px rgba(255,255,255,.035) inset,
+        0 -1px 0 rgba(0,0,0,.24) inset;
       transform-origin: 100% 0%;
-      transform: translate3d(0, 0, 0);
+      transform: translate3d(0,0,0);
       backface-visibility: hidden;
       contain: layout paint;
-      will-change: clip-path, transform, opacity;
-
+      will-change: width, height, border-radius;
       transition:
-        clip-path 520ms var(--material-spring),
-        background-color 260ms ease,
-        box-shadow 320ms ease,
+        width 430ms var(--geometry-spring),
+        height 430ms var(--geometry-spring),
+        border-radius 430ms var(--geometry-spring),
         opacity 150ms ease,
         transform 180ms ease;
     }
@@ -114,24 +116,18 @@ export function mountSamplerSurfaceDom(
       border-radius: inherit;
       corner-shape: inherit;
       background:
-        radial-gradient(
-          88% 58% at var(--light-x) var(--light-y),
-          rgba(255, 255, 255, .145) 0%,
-          rgba(255, 255, 255, .060) 24%,
-          rgba(255, 255, 255, .012) 52%,
-          transparent 72%
-        ),
         linear-gradient(
-          180deg,
-          rgba(255, 255, 255, .035) 0%,
-          transparent 26%,
-          rgba(255, 255, 255, .010) 100%
+          132deg,
+          rgba(255,255,255,.095) 0%,
+          rgba(255,255,255,.018) 19%,
+          transparent 44%
+        ),
+        radial-gradient(
+          76% 48% at 72% 105%,
+          rgba(255,255,255,.024),
+          transparent 72%
         );
       mix-blend-mode: screen;
-      opacity: .78;
-      transition:
-        opacity 320ms ease,
-        filter 420ms var(--material-spring);
     }
 
     .surface::after {
@@ -143,89 +139,67 @@ export function mountSamplerSurfaceDom(
       border-radius: inherit;
       corner-shape: inherit;
       box-shadow:
-        0 0 0 .7px rgba(255, 255, 255, .075) inset,
-        0 1px 0 rgba(255, 255, 255, .065) inset,
-        0 -1px 0 rgba(0, 0, 0, .15) inset;
-      opacity: .86;
+        0 0 0 1px rgba(255,255,255,.038) inset,
+        0 0 18px rgba(255,255,255,.014) inset;
     }
 
     .surface.is-live {
-      clip-path: inset(0 0 286px 154px round 25px);
+      width: 198px;
+      height: 50px;
+      border-radius: 25px;
       pointer-events: auto;
       cursor: pointer;
-      animation: island-settle 430ms both;
     }
 
-    .surface.is-live .stop-control {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    .surface.is-frozen {
-      cursor: default;
-    }
+    .surface.is-live .stop-control { opacity: 1; }
+    .surface.is-frozen { cursor: default; }
 
     .surface.is-expanded {
-      clip-path: inset(0 round 48px);
+      width: 352px;
+      height: 336px;
+      border-radius: 48px;
       pointer-events: auto;
-      background: rgba(15, 15, 18, .61);
       box-shadow:
-        0 28px 72px rgba(0, 0, 0, .28),
-        0 10px 30px rgba(0, 0, 0, .13),
-        0 1px 0 rgba(255, 255, 255, .16) inset,
-        0 0 0 .5px rgba(255, 255, 255, .070) inset;
-      animation: surface-settle 560ms both;
-    }
-
-    .surface.is-expanded::before {
-      opacity: .9;
-      filter: saturate(1.03);
+        0 26px 64px rgba(0,0,0,.36),
+        0 8px 22px rgba(0,0,0,.20),
+        0 1px 0 rgba(255,255,255,.18) inset,
+        0 0 0 1px rgba(255,255,255,.035) inset,
+        0 -1px 0 rgba(0,0,0,.28) inset;
     }
 
     .surface.is-closing {
       opacity: 0;
-      transform: translateY(-4px) scale(.986);
+      transform: translateY(-4px) scale(.988);
       transition-duration: 120ms;
     }
 
     .recorder {
       position: absolute;
       z-index: 2;
-      top: 0;
-      right: 0;
-      width: 198px;
-      height: 50px;
+      inset: 0;
       display: grid;
-      grid-template-columns: 24px minmax(0, 1fr) 40px;
+      grid-template-columns: 24px 1fr 42px;
       align-items: center;
       gap: 10px;
-      padding: 0 12px 0 10px;
-
+      padding: 0 13px 0 10px;
       opacity: 0;
-      transform: translate3d(0, 2px, 0) scale(.985);
-      transform-origin: 100% 0%;
-      filter: blur(1.5px);
-
+      transform: translateY(1px);
       transition:
-        opacity 150ms ease 72ms,
-        transform 360ms var(--material-spring) 32ms,
-        filter 220ms ease 42ms;
+        opacity 160ms ease 90ms,
+        transform 220ms cubic-bezier(.2,.8,.2,1) 70ms;
     }
 
     .surface.is-live .recorder {
       opacity: 1;
-      transform: translate3d(0, 0, 0) scale(1);
-      filter: blur(0);
+      transform: translateY(0);
     }
 
     .surface.is-expanded .recorder {
       opacity: 0;
-      transform: translate3d(0, -3px, 0) scale(.975);
-      filter: blur(3px);
+      transform: translateY(-8px) scale(.98);
       transition:
         opacity 90ms ease,
-        transform 180ms ease,
-        filter 140ms ease;
+        transform 150ms cubic-bezier(.4,0,.8,.2);
     }
 
     .stop-control {
@@ -236,22 +210,31 @@ export function mountSamplerSurfaceDom(
       padding: 0;
       border: 0;
       border-radius: 999px;
-      background: rgba(255, 69, 58, .96);
+      background:
+        radial-gradient(
+          circle at 34% 28%,
+          rgba(255,255,255,.18),
+          transparent 42%
+        ),
+        linear-gradient(
+          180deg,
+          #ff4b42 0%,
+          #ff3129 54%,
+          #e92721 100%
+        );
       box-shadow:
-        0 4px 12px rgba(255, 59, 48, .18),
-        0 1px 0 rgba(255, 255, 255, .26) inset,
-        0 0 0 .5px rgba(255, 255, 255, .08) inset;
+        0 4px 12px rgba(255,48,40,.18),
+        0 1px 0 rgba(255,255,255,.22) inset,
+        0 -1px 0 rgba(110,0,0,.16) inset;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-
-      opacity: 0;
-      transform: scale(.76);
       transition:
-        transform 300ms var(--material-spring),
-        filter 110ms ease,
+        filter 120ms ease,
         opacity 120ms ease,
-        background-color 140ms ease;
-      will-change: transform, filter;
+        background 120ms ease,
+        box-shadow 120ms ease;
+      transform: translateZ(0);
+      will-change: filter;
     }
 
     .stop-control::before {
@@ -264,28 +247,22 @@ export function mountSamplerSurfaceDom(
       margin-left: -3.5px;
       margin-top: -3.5px;
       border-radius: 2px;
-      background: rgba(255, 255, 255, .98);
+      background: rgba(255,255,255,.96);
+      box-shadow: 0 0 4px rgba(255,255,255,.12);
       pointer-events: none;
+      transform: translateZ(0);
     }
 
-    .stop-control:hover {
-      filter: brightness(1.055);
-    }
-
-    .stop-control:active {
-      transform: scale(.88);
-      filter: brightness(.96);
-    }
+    .stop-control:hover { filter: brightness(1.04); }
+    .stop-control:active { filter: brightness(.96); }
 
     .surface.is-frozen .stop-control {
-      opacity: .52;
+      opacity: .58;
       cursor: default;
       filter: saturate(.72);
     }
 
-    .surface:not(.is-live) .stop-control {
-      opacity: 0;
-    }
+    .surface:not(.is-live) .stop-control { opacity: 0; }
 
     .wave-wrap {
       position: relative;
@@ -297,19 +274,19 @@ export function mountSamplerSurfaceDom(
       -webkit-mask-image: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(0, 0, 0, .42) 8%,
-        #000 20%,
+        rgba(0,0,0,.5) 10%,
+        #000 22%,
         #000 88%,
-        rgba(0, 0, 0, .62) 95%,
+        rgba(0,0,0,.7) 95%,
         transparent 100%
       );
       mask-image: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(0, 0, 0, .42) 8%,
-        #000 20%,
+        rgba(0,0,0,.5) 10%,
+        #000 22%,
         #000 88%,
-        rgba(0, 0, 0, .62) 95%,
+        rgba(0,0,0,.7) 95%,
         transparent 100%
       );
     }
@@ -321,7 +298,7 @@ export function mountSamplerSurfaceDom(
     }
 
     .timer {
-      color: rgba(255, 255, 255, .83);
+      color: rgba(255,255,255,.86);
       font-family:
         ui-monospace,
         "SFMono-Regular",
@@ -329,13 +306,12 @@ export function mountSamplerSurfaceDom(
         "Roboto Mono",
         monospace;
       font-size: 10px;
-      font-weight: 560;
+      font-weight: 590;
       line-height: 1;
-      letter-spacing: -.045em;
+      letter-spacing: -.055em;
       font-variant-numeric: tabular-nums;
       text-align: right;
       white-space: nowrap;
-      text-shadow: 0 1px 5px rgba(0, 0, 0, .26);
     }
 
     iframe {
@@ -348,47 +324,24 @@ export function mountSamplerSurfaceDom(
       border: 0;
       background: transparent;
       color-scheme: dark;
-
       opacity: 0;
       pointer-events: none;
-      transform: translate3d(0, 10px, 0) scale(.985);
-      transform-origin: 50% 44%;
-      filter: blur(5px);
-
+      transform: translateY(6px) scale(.994);
       transition:
-        opacity 190ms ease-out 105ms,
-        transform 470ms var(--material-spring) 48ms,
-        filter 260ms ease 70ms;
-      will-change: opacity, transform, filter;
+        opacity 145ms ease 54ms,
+        transform 300ms var(--geometry-spring) 28ms;
     }
 
     .surface.is-editor-ready iframe {
       opacity: 1;
       pointer-events: auto;
-      transform: translate3d(0, 0, 0) scale(1);
-      filter: blur(0);
-    }
-
-    @keyframes island-settle {
-      0% { transform: translate3d(0, -1px, 0) scale(.985); }
-      45% { transform: translate3d(0, 0, 0) scale(1.008); }
-      72% { transform: translate3d(0, 0, 0) scale(.998); }
-      100% { transform: translate3d(0, 0, 0) scale(1); }
-    }
-
-    @keyframes surface-settle {
-      0% { transform: translate3d(0, -1px, 0) scale(.994); }
-      44% { transform: translate3d(0, 0, 0) scale(1.006); }
-      70% { transform: translate3d(0, 0, 0) scale(.9985); }
-      100% { transform: translate3d(0, 0, 0) scale(1); }
+      transform: translateY(0) scale(1);
     }
 
     @media (prefers-reduced-motion: reduce) {
       .surface,
       .recorder,
-      .stop-control,
       iframe {
-        animation-duration: 1ms !important;
         transition-duration: 1ms !important;
         transition-delay: 0ms !important;
       }
@@ -512,26 +465,36 @@ export function mountSamplerSurfaceDom(
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     timer.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
-    timerRaf = window.requestAnimationFrame(renderTimer);
+
+    if (frozenAt === null) {
+      timerRaf = window.requestAnimationFrame(renderTimer);
+    } else {
+      timerRaf = 0;
+    }
   };
 
   const freeze = () => {
     if (frozenAt !== null) return;
     frozenAt = performance.now();
     surface.classList.add('is-frozen');
+
+    if (timerRaf) {
+      window.cancelAnimationFrame(timerRaf);
+      timerRaf = 0;
+    }
+    renderTimer();
   };
 
   const revealEditor = () => {
     if (!expandRequested || !editorReady) return;
 
     window.requestAnimationFrame(() => {
-      if (closed) return;
-
-      // Reveal the already-rendered editor in the exact frame in which
-      // geometry starts expanding. This avoids the empty/black shell phase.
-      surface.classList.add('is-expanded', 'is-editor-ready');
       window.requestAnimationFrame(() => {
-        frame.contentWindow?.postMessage({ type: 'tab-sampler:present' }, '*');
+        if (closed) return;
+
+        // Start the morph only after the editor has completed its first paint.
+        // This keeps WaveSurfer initialization out of the animation frame budget.
+        surface.classList.add('is-expanded', 'is-editor-ready');
       });
     });
   };
@@ -565,6 +528,7 @@ export function mountSamplerSurfaceDom(
 
       frozenAt = null;
       startedAt = performance.now();
+      timerRaf = window.requestAnimationFrame(renderTimer);
       smoothedPeak = .04;
       peaks.fill(.04);
       drawWave();
@@ -653,20 +617,6 @@ export function mountSamplerSurfaceDom(
     if (event.data?.type === 'tab-sampler:close') close();
   };
 
-  const updateMaterialLight = (event: PointerEvent) => {
-    const rect = surface.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    const x = Math.max(8, Math.min(92, ((event.clientX - rect.left) / rect.width) * 100));
-    const y = Math.max(-6, Math.min(72, ((event.clientY - rect.top) / rect.height) * 100));
-    surface.style.setProperty('--light-x', `${x.toFixed(1)}%`);
-    surface.style.setProperty('--light-y', `${y.toFixed(1)}%`);
-  };
-
-  const resetMaterialLight = () => {
-    surface.style.setProperty('--light-x', '24%');
-    surface.style.setProperty('--light-y', '2%');
-  };
-
   const onPointerDown = (event: PointerEvent) => {
     if (!surface.classList.contains('is-expanded')) return;
     if (event.composedPath().includes(host)) return;
@@ -694,8 +644,6 @@ export function mountSamplerSurfaceDom(
     window.cancelAnimationFrame(timerRaf);
     if (demoMeterTimer) window.clearInterval(demoMeterTimer);
     surface.removeEventListener('click', requestStop);
-    surface.removeEventListener('pointermove', updateMaterialLight);
-    surface.removeEventListener('pointerleave', resetMaterialLight);
     window.removeEventListener('message', onWindowMessage);
     document.removeEventListener('pointerdown', onPointerDown, true);
     document.removeEventListener('keydown', onKeyDown, true);
@@ -716,8 +664,6 @@ export function mountSamplerSurfaceDom(
     requestStop();
   });
   surface.addEventListener('click', requestStop);
-  surface.addEventListener('pointermove', updateMaterialLight);
-  surface.addEventListener('pointerleave', resetMaterialLight);
   window.addEventListener('message', onWindowMessage);
   document.addEventListener('pointerdown', onPointerDown, true);
   document.addEventListener('keydown', onKeyDown, true);
