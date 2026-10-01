@@ -61,30 +61,11 @@ function drawIcon(size: number, state: IconState): ImageData {
   if (state === 'recording' || state === 'recordingDim') {
     const bright = state === 'recording';
 
-    // Recording glyph: red outer ring, dark core, white inner target.
-    // Designed to read clearly at 16px without becoming a generic red dot.
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 6.15 * s, 0, Math.PI * 2);
+    ctx.arc(size / 2, size / 2, 5.7 * s, 0, Math.PI * 2);
     ctx.fillStyle = bright
-      ? 'rgba(255, 59, 48, 1)'
-      : 'rgba(196, 42, 37, .82)';
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 4.45 * s, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(19,19,21,.98)';
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 2.65 * s, 0, Math.PI * 2);
-    ctx.fillStyle = bright
-      ? 'rgba(248,248,248,.98)'
-      : 'rgba(226,226,226,.78)';
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 1.35 * s, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(23,23,25,.98)';
+      ? '#FF3B30'
+      : '#D92E25';
     ctx.fill();
   } else {
     roundedRect(ctx, 1.3 * s, 2.0 * s, 13.4 * s, 12 * s, 3.3 * s);
