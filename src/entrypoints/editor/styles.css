@@ -44,12 +44,14 @@ button { font: inherit; }
   clip-path: inset(0 round 54px);
 
   background:
-    radial-gradient(circle at 50% 34%, rgba(255,255,255,0.032), transparent 43%),
-    linear-gradient(180deg, #1d1d1e 0%, #181819 52%, #141415 100%);
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,0.028), transparent 44%),
+    linear-gradient(180deg,
+      rgba(24,24,27,.18) 0%,
+      rgba(16,16,19,.12) 54%,
+      rgba(10,10,12,.18) 100%);
 
   box-shadow:
-    0 1px 0 rgba(255,255,255,0.11) inset,
-    0 0 0 1px rgba(255,255,255,0.035) inset;
+    0 1px 0 rgba(255,255,255,0.07) inset;
 
   user-select: none;
 }
@@ -62,8 +64,8 @@ button { font: inherit; }
   border-radius: inherit;
   corner-shape: inherit;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 8%),
-    radial-gradient(circle at 50% 105%, rgba(255,255,255,0.018), transparent 38%);
+    linear-gradient(180deg, rgba(255,255,255,0.038), transparent 8%),
+    radial-gradient(circle at 50% 105%, rgba(255,255,255,0.014), transparent 38%);
   mix-blend-mode: screen;
 }
 
