@@ -2,7 +2,7 @@ interface LoopIconProps {
   size?: number;
 }
 
-export function LoopIcon({ size = 16 }: LoopIconProps) {
+export function LoopIcon({ size = 28 }: LoopIconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -12,15 +12,15 @@ export function LoopIcon({ size = 16 }: LoopIconProps) {
       fill="none"
     >
       <path
-        d="M7.7 6.15A7 7 0 1 1 5.2 15.7"
+        d="M4.05 8.6A8 8 0 1 1 4.9 16.85"
         stroke="currentColor"
-        strokeWidth="1.85"
+        strokeWidth="1.75"
         strokeLinecap="round"
       />
       <path
-        d="M4.9 6.45 7.95 6 8.35 9.05"
+        d="M3.35 4.95v4.7h4.7"
         stroke="currentColor"
-        strokeWidth="1.85"
+        strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
