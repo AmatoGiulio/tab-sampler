@@ -104,12 +104,14 @@ button { font: inherit; }
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(0,0,0,.18) 5%,
-    rgba(0,0,0,.72) 13%,
-    #000 22%,
-    #000 78%,
-    rgba(0,0,0,.72) 87%,
-    rgba(0,0,0,.18) 95%,
+    rgba(0,0,0,.10) 7%,
+    rgba(0,0,0,.46) 16%,
+    rgba(0,0,0,.86) 25%,
+    #000 34%,
+    #000 66%,
+    rgba(0,0,0,.86) 75%,
+    rgba(0,0,0,.46) 84%,
+    rgba(0,0,0,.10) 93%,
     transparent 100%
   );
   mask-image: linear-gradient(
@@ -224,10 +226,22 @@ button { font: inherit; }
   background: #ff3b30;
   opacity: 0;
   pointer-events: none;
-  will-change: transform;
+  will-change: transform, opacity, filter;
+  filter: brightness(.82);
   box-shadow:
-    0 0 4px rgba(255,59,48,.85),
-    0 0 10px rgba(255,59,48,.34);
+    0 0 3px rgba(255,59,48,.66),
+    0 0 8px rgba(255,59,48,.22);
+  transition:
+    opacity 140ms ease,
+    filter 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.editor.is-ready .playhead {
+  filter: brightness(1);
+  box-shadow:
+    0 0 4px rgba(255,59,48,.82),
+    0 0 10px rgba(255,59,48,.28);
 }
 
 .playhead__cap { display: none; }
@@ -236,10 +250,10 @@ button { font: inherit; }
   position: relative;
   z-index: 10;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 54px 72px;
+  grid-template-columns: minmax(0, 1fr) 52px 72px;
   align-items: center;
-  gap: 12px;
-  padding: 0 0 2px 4px;
+  gap: 9px;
+  padding: 0 0 0 2px;
 }
 
 .sample-meta {
@@ -272,8 +286,8 @@ button { font: inherit; }
   margin-top: 10px;
   color: #f6f6f3;
   font-family: ui-monospace, "SFMono-Regular", "SF Mono", "Roboto Mono", monospace;
-  font-size: 21px;
-  font-weight: 610;
+  font-size: 20px;
+  font-weight: 560;
   line-height: 1;
   letter-spacing: -.07em;
   font-variant-numeric: tabular-nums;
@@ -287,15 +301,15 @@ button { font: inherit; }
   -webkit-tap-highlight-color: transparent;
   transform: translateZ(0);
   transition:
-    transform 115ms cubic-bezier(.2,.8,.2,1),
-    box-shadow 140ms ease,
-    filter 140ms ease,
+    transform 105ms cubic-bezier(.22,.9,.28,1),
+    box-shadow 130ms ease,
+    filter 120ms ease,
     opacity 120ms ease,
-    background 140ms ease;
+    background 130ms ease;
 }
 
 .control:disabled {
-  opacity: .34;
+  opacity: 0;
   cursor: default;
 }
 
@@ -374,15 +388,12 @@ button { font: inherit; }
 @keyframes waveform-materialize {
   0% {
     opacity: 0;
-    clip-path: inset(0 18% 0 18% round 10px);
-    transform: scaleX(.985);
-  }
-  55% {
-    opacity: .88;
+    clip-path: inset(0 10% 0 10% round 12px);
+    transform: scaleX(.992);
   }
   100% {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round 10px);
+    clip-path: inset(0 0 0 0 round 12px);
     transform: scaleX(1);
   }
 }
@@ -416,7 +427,12 @@ button { font: inherit; }
 }
 
 .editor:hover .utility-actions {
-  opacity: .72;
+  opacity: 0;
+}
+
+.utility-actions:hover,
+.utility-actions:focus-within {
+  opacity: .78;
 }
 
 .utility-action {
