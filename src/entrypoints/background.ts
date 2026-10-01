@@ -195,10 +195,10 @@ async function mountSamplerSurface(
           z-index: 2;
           inset: 0;
           display: grid;
-          grid-template-columns: 10px 1fr 42px;
+          grid-template-columns: 24px 1fr 42px;
           align-items: center;
           gap: 10px;
-          padding: 0 13px 0 14px;
+          padding: 0 13px 0 10px;
           opacity: 0;
           transform: translateY(1px);
           transition:
@@ -219,20 +219,59 @@ async function mountSamplerSurface(
             transform 150ms cubic-bezier(.4,0,.8,.2);
         }
 
-        .status-dot {
-          width: 8px;
-          height: 8px;
+        .stop-control {
+          width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 0;
           border-radius: 999px;
-          background: #ff3b30;
+          background:
+            radial-gradient(
+              circle at 34% 28%,
+              rgba(255,255,255,.18),
+              transparent 42%
+            ),
+            linear-gradient(
+              180deg,
+              #ff4b42 0%,
+              #ff3129 54%,
+              #e92721 100%
+            );
           box-shadow:
-            0 0 0 1px rgba(255,255,255,.06) inset,
-            0 0 10px rgba(255,59,48,.36);
+            0 4px 12px rgba(255,48,40,.18),
+            0 1px 0 rgba(255,255,255,.22) inset,
+            0 -1px 0 rgba(110,0,0,.16) inset;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          transition:
+            transform 110ms cubic-bezier(.22,.9,.28,1),
+            filter 120ms ease,
+            opacity 120ms ease;
         }
 
-        .surface.is-frozen .status-dot {
-          box-shadow:
-            0 0 0 1px rgba(255,255,255,.05) inset,
-            0 0 5px rgba(255,59,48,.18);
+        .stop-control::before {
+          content: '';
+          width: 7px;
+          height: 7px;
+          border-radius: 2px;
+          background: rgba(255,255,255,.96);
+          box-shadow: 0 0 4px rgba(255,255,255,.12);
+        }
+
+        .stop-control:hover {
+          filter: brightness(1.04);
+        }
+
+        .stop-control:active {
+          transform: scale(.93);
+        }
+
+        .surface.is-frozen .stop-control {
+          opacity: .58;
+          cursor: default;
+          filter: saturate(.72);
         }
 
         .wave-wrap {
@@ -328,8 +367,11 @@ async function mountSamplerSurface(
       const recorder = document.createElement('div');
       recorder.className = 'recorder';
 
-      const dot = document.createElement('span');
-      dot.className = 'status-dot';
+      const stopControl = document.createElement('button');
+      stopControl.className = 'stop-control';
+      stopControl.type = 'button';
+      stopControl.setAttribute('aria-label', 'Stop recording');
+      stopControl.title = 'Stop recording';
 
       const waveWrap = document.createElement('div');
       waveWrap.className = 'wave-wrap';
@@ -341,7 +383,7 @@ async function mountSamplerSurface(
       timer.className = 'timer';
       timer.textContent = '0:00';
 
-      recorder.append(dot, waveWrap, timer);
+      recorder.append(stopControl, waveWrap, timer);
 
       const frame = document.createElement('iframe');
       frame.title = 'Tab Sampler editor';
@@ -543,6 +585,10 @@ async function mountSamplerSurface(
         }
       };
 
+      stopControl.addEventListener('click', (event) => {
+        event.stopPropagation();
+        requestStop();
+      });
       surface.addEventListener('click', requestStop);
       chrome.runtime.onMessage.addListener(runtimeListener);
       window.addEventListener('message', onWindowMessage);
