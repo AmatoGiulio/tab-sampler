@@ -250,9 +250,9 @@ button { font: inherit; }
   position: relative;
   z-index: 10;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 50px 58px;
+  grid-template-columns: minmax(0, 1fr) 52px 72px;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 0 0 0 2px;
 }
 
@@ -319,106 +319,70 @@ button { font: inherit; }
   outline-offset: 3px;
 }
 
-.control--loop,
-.control--play {
-  height: 50px;
+.control--loop {
+  justify-self: center;
+  width: 52px;
+  height: 72px;
   display: grid;
   place-items: center;
   border-radius: 25px;
   corner-shape: squircle;
-  -webkit-backdrop-filter:
-    blur(30px)
-    saturate(165%)
-    brightness(90%);
-  backdrop-filter:
-    blur(30px)
-    saturate(165%)
-    brightness(90%);
-}
-
-.control--loop {
-  justify-self: center;
-  width: 50px;
-  color: rgba(255,255,255,.90);
   background:
-    radial-gradient(
-      120% 140% at 22% -28%,
-      rgba(255,255,255,.095) 0%,
-      rgba(255,255,255,.016) 34%,
-      transparent 62%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(29,29,32,.88) 0%,
-      rgba(15,15,18,.92) 100%
-    );
+    linear-gradient(180deg,
+      rgba(255,255,255,.12) 0%,
+      rgba(255,255,255,.07) 45%,
+      rgba(255,255,255,.055) 100%);
+  color: rgba(255,255,255,.92);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  backdrop-filter: blur(26px) saturate(160%);
   box-shadow:
-    0 10px 24px rgba(0,0,0,.24),
-    0 1px 0 rgba(255,255,255,.15) inset,
-    0 0 0 1px rgba(255,255,255,.035) inset,
-    0 -1px 0 rgba(0,0,0,.24) inset;
+    0 10px 22px rgba(0,0,0,.24),
+    0 1px 0 rgba(255,255,255,.12) inset,
+    0 -1px 0 rgba(0,0,0,.18) inset;
 }
 
 .control--loop:hover:not(:disabled) {
-  filter: brightness(1.045);
+  filter: brightness(1.035);
 }
 
 .control--loop:active:not(:disabled) {
-  transform: scale(.955);
+  transform: scale(.965);
 }
 
 .control--loop.is-active {
-  color: #ffffff;
   background:
-    radial-gradient(
-      120% 140% at 22% -28%,
-      rgba(255,255,255,.12) 0%,
-      rgba(255,255,255,.022) 36%,
-      transparent 64%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(43,43,47,.94) 0%,
-      rgba(22,22,25,.96) 100%
-    );
+    linear-gradient(180deg, #3b3b3d 0%, #303032 48%, #29292b 100%);
+  color: #ffffff;
   box-shadow:
-    0 10px 24px rgba(0,0,0,.30),
-    0 1px 0 rgba(255,255,255,.18) inset,
+    0 12px 24px rgba(0,0,0,.34),
     0 0 0 1px rgba(255,255,255,.05) inset,
-    0 -1px 0 rgba(0,0,0,.28) inset;
+    0 1px 0 rgba(255,255,255,.09) inset;
 }
 
 .control--play {
   justify-self: end;
-  width: 58px;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
   color: #fff;
   background:
-    radial-gradient(
-      115% 145% at 24% -22%,
-      rgba(255,255,255,.20) 0%,
-      rgba(255,255,255,.035) 34%,
-      transparent 61%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(255,72,64,.98) 0%,
-      rgba(255,49,41,.98) 52%,
-      rgba(230,34,28,.98) 100%
-    );
+    radial-gradient(circle at 36% 22%, rgba(255,255,255,.16), transparent 34%),
+    linear-gradient(180deg, #ff4940 0%, #ff332b 52%, #ee241e 100%);
   box-shadow:
-    0 11px 26px rgba(0,0,0,.29),
-    0 5px 16px rgba(255,48,40,.13),
+    0 14px 30px rgba(0,0,0,.34),
+    0 6px 18px rgba(255,45,38,.16),
     0 1px 0 rgba(255,255,255,.24) inset,
-    0 0 0 1px rgba(255,255,255,.045) inset,
-    0 -1px 0 rgba(102,0,0,.20) inset;
+    0 -1px 0 rgba(100,0,0,.18) inset;
 }
 
 .control--play:hover:not(:disabled) {
-  filter: brightness(1.035);
+  filter: brightness(1.025);
 }
 
 .control--play:active:not(:disabled) {
-  transform: scale(.955);
+  transform: scale(.965);
 }
 
 @keyframes waveform-materialize {
@@ -470,30 +434,23 @@ button { font: inherit; }
 }
 
 .utility-action {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   display: grid;
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 12px;
-  corner-shape: squircle;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(31,31,34,.82) 0%,
-      rgba(17,17,20,.88) 100%
-    );
-  color: rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: rgba(255,255,255,.055);
+  color: rgba(255,255,255,.68);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
   -webkit-backdrop-filter: blur(12px) saturate(150%);
   backdrop-filter: blur(12px) saturate(150%);
   box-shadow:
-    0 1px 0 rgba(255,255,255,.12) inset,
-    0 0 0 1px rgba(255,255,255,.03) inset,
-    0 5px 12px rgba(0,0,0,.16);
+    0 1px 0 rgba(255,255,255,.08) inset,
+    0 4px 10px rgba(0,0,0,.14);
   transition:
     transform 120ms cubic-bezier(.2,.8,.2,1),
     background 120ms ease,
@@ -501,12 +458,7 @@ button { font: inherit; }
 }
 
 .utility-action:hover:not(:disabled) {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(42,42,46,.88) 0%,
-      rgba(23,23,26,.92) 100%
-    );
+  background: rgba(255,255,255,.085);
   color: rgba(255,255,255,.92);
 }
 
