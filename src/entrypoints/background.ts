@@ -167,6 +167,10 @@ async function mountSamplerSurface(
           cursor: pointer;
         }
 
+        .surface.is-live .stop-control {
+          opacity: 1;
+        }
+
         .surface.is-frozen {
           cursor: default;
         }
@@ -222,8 +226,8 @@ async function mountSamplerSurface(
         .stop-control {
           width: 24px;
           height: 24px;
-          display: grid;
-          place-items: center;
+          display: block;
+          position: relative;
           padding: 0;
           border: 0;
           border-radius: 999px;
@@ -246,18 +250,28 @@ async function mountSamplerSurface(
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           transition:
-            transform 110ms cubic-bezier(.22,.9,.28,1),
             filter 120ms ease,
-            opacity 120ms ease;
+            opacity 120ms ease,
+            background 120ms ease,
+            box-shadow 120ms ease;
+          transform: translateZ(0);
+          will-change: filter;
         }
 
         .stop-control::before {
           content: '';
+          position: absolute;
+          left: 50%;
+          top: 50%;
           width: 7px;
           height: 7px;
+          margin-left: -3.5px;
+          margin-top: -3.5px;
           border-radius: 2px;
           background: rgba(255,255,255,.96);
           box-shadow: 0 0 4px rgba(255,255,255,.12);
+          pointer-events: none;
+          transform: translateZ(0);
         }
 
         .stop-control:hover {
@@ -265,13 +279,17 @@ async function mountSamplerSurface(
         }
 
         .stop-control:active {
-          transform: scale(.93);
+          filter: brightness(.96);
         }
 
         .surface.is-frozen .stop-control {
           opacity: .58;
           cursor: default;
           filter: saturate(.72);
+        }
+
+        .surface:not(.is-live) .stop-control {
+          opacity: 0;
         }
 
         .wave-wrap {
