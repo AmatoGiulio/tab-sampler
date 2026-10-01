@@ -39,7 +39,6 @@ export function mountSamplerSurfaceDom(
 
     .surface {
       position: absolute;
-      z-index: 5;
       top: 16px;
       right: 16px;
       width: 44px;
@@ -88,99 +87,6 @@ export function mountSamplerSurfaceDom(
         opacity 150ms ease,
         transform 180ms ease;
     }
-
-
-    .morph-shell {
-      position: absolute;
-      z-index: 4;
-      top: 16px;
-      right: 16px;
-      width: 198px;
-      height: 50px;
-      overflow: hidden;
-      pointer-events: none;
-      border-radius: 25px;
-      corner-shape: squircle;
-      isolation: isolate;
-      opacity: 0;
-      transform-origin: 100% 0%;
-      transform: translate3d(0,0,0) scale(1,1);
-      background:
-        radial-gradient(
-          120% 140% at 22% -28%,
-          rgba(255,255,255,.105) 0%,
-          rgba(255,255,255,.018) 34%,
-          transparent 62%
-        ),
-        linear-gradient(
-          180deg,
-          rgba(24,24,27,.88) 0%,
-          rgba(12,12,15,.91) 100%
-        );
-      box-shadow:
-        0 12px 34px rgba(0,0,0,.29),
-        0 1px 0 rgba(255,255,255,.17) inset,
-        0 0 0 1px rgba(255,255,255,.035) inset,
-        0 -1px 0 rgba(0,0,0,.24) inset;
-      backface-visibility: hidden;
-      contain: paint;
-      will-change: transform, opacity;
-    }
-
-    .morph-shell::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      border-radius: inherit;
-      corner-shape: inherit;
-      background:
-        linear-gradient(
-          132deg,
-          rgba(255,255,255,.095) 0%,
-          rgba(255,255,255,.018) 19%,
-          transparent 44%
-        ),
-        radial-gradient(
-          76% 48% at 72% 105%,
-          rgba(255,255,255,.024),
-          transparent 72%
-        );
-      mix-blend-mode: screen;
-    }
-
-    .morph-shell::after {
-      content: '';
-      position: absolute;
-      inset: 1px;
-      pointer-events: none;
-      border-radius: inherit;
-      corner-shape: inherit;
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,.038) inset,
-        0 0 18px rgba(255,255,255,.014) inset;
-    }
-
-    .morph-shell--destination {
-      width: 352px;
-      height: 336px;
-      border-radius: 48px;
-      opacity: 0;
-      transform:
-        translate3d(0,0,0)
-        scale(0.5625, 0.1488095238095238);
-    }
-
-    .surface.is-morphing {
-      transition: none !important;
-    }
-
-    .surface.is-morphing .recorder {
-      transition:
-        opacity 70ms ease,
-        transform 110ms cubic-bezier(.4,0,.8,.2);
-    }
-
 
     .surface::before {
       content: '';
@@ -429,12 +335,6 @@ export function mountSamplerSurfaceDom(
   const surface = document.createElement('div');
   surface.className = 'surface';
 
-  const morphShell = document.createElement('div');
-  morphShell.className = 'morph-shell morph-shell--source';
-
-  const morphDestination = document.createElement('div');
-  morphDestination.className = 'morph-shell morph-shell--destination';
-
   const recorder = document.createElement('div');
   recorder.className = 'recorder';
 
@@ -462,7 +362,7 @@ export function mountSamplerSurfaceDom(
   frame.setAttribute('aria-label', 'Tab Sampler audio editor');
 
   surface.append(recorder, frame);
-  stage.append(morphShell, morphDestination, surface);
+  stage.append(surface);
   shadow.append(style, stage);
   document.documentElement.append(host);
 
@@ -479,19 +379,6 @@ export function mountSamplerSurfaceDom(
   let editorReady = false;
   let expandRequested = false;
   let editorLoadStarted = false;
-  let morphAnimation: Animation | null = null;
-  let sourceFadeAnimation: Animation | null = null;
-  let destinationFadeAnimation: Animation | null = null;
-  let destinationMorphAnimation: Animation | null = null;
-  let morphSwapTimer = 0;
-  let morphRevealTimer = 0;
-
-  const MORPH_DURATION = 360;
-  const EXPANDED_SCALE_X = 352 / 198;
-  const EXPANDED_SCALE_Y = 336 / 50;
-  const MORPH_EASING =
-    'linear(0, .018, .064, .15, .278, .438, .602, .744, .854, .928, .973, .996, 1.006, 1.004, 1)';
-
 
   const resizeCanvas = () => {
     const rect = canvas.getBoundingClientRect();
@@ -559,207 +446,24 @@ export function mountSamplerSurfaceDom(
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     timer.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
-
-    if (frozenAt === null) {
-      timerRaf = window.requestAnimationFrame(renderTimer);
-    } else {
-      timerRaf = 0;
-    }
+    timerRaf = window.requestAnimationFrame(renderTimer);
   };
 
   const freeze = () => {
     if (frozenAt !== null) return;
     frozenAt = performance.now();
     surface.classList.add('is-frozen');
-
-    if (timerRaf) {
-      window.cancelAnimationFrame(timerRaf);
-      timerRaf = 0;
-    }
-    renderTimer();
-  };
-
-  const clearMorphTimers = () => {
-    if (morphSwapTimer) window.clearTimeout(morphSwapTimer);
-    if (morphRevealTimer) window.clearTimeout(morphRevealTimer);
-    morphSwapTimer = 0;
-    morphRevealTimer = 0;
-  };
-
-  const cancelMorphAnimations = () => {
-    morphAnimation?.cancel();
-    sourceFadeAnimation?.cancel();
-    destinationFadeAnimation?.cancel();
-    destinationMorphAnimation?.cancel();
-    morphAnimation = null;
-    sourceFadeAnimation = null;
-    destinationFadeAnimation = null;
-    destinationMorphAnimation = null;
-    clearMorphTimers();
   };
 
   const revealEditor = () => {
     if (!expandRequested || !editorReady) return;
-    if (surface.classList.contains('is-expanded')) return;
 
-    cancelMorphAnimations();
-
-    const collapsedScaleX = 198 / 352;
-    const collapsedScaleY = 50 / 336;
-
-    morphShell.style.opacity = '1';
-    morphShell.style.transform = 'translate3d(0,0,0) scale(1,1)';
-
-    morphDestination.style.opacity = '0';
-    morphDestination.style.transform =
-      `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`;
-
-    surface.classList.add('is-morphing');
-
-    // Fade the expensive real glass out immediately.
-    sourceFadeAnimation = surface.animate(
-      [
-        { opacity: 1, offset: 0 },
-        { opacity: 1, offset: .18 },
-        { opacity: 0, offset: 1 },
-      ],
-      {
-        duration: 82,
-        easing: 'ease-out',
-        fill: 'forwards',
-      },
-    );
-
-    // Source proxy: exact island silhouette at t=0.
-    morphAnimation = morphShell.animate(
-      [
-        {
-          transform: 'translate3d(0,0,0) scale(1,1)',
-          opacity: 1,
-          offset: 0,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${EXPANDED_SCALE_X},${EXPANDED_SCALE_Y})`,
-          opacity: 1,
-          offset: .44,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${EXPANDED_SCALE_X},${EXPANDED_SCALE_Y})`,
-          opacity: 0,
-          offset: .72,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${EXPANDED_SCALE_X},${EXPANDED_SCALE_Y})`,
-          opacity: 0,
-          offset: 1,
-        },
-      ],
-      {
-        duration: MORPH_DURATION,
-        easing: MORPH_EASING,
-        fill: 'forwards',
-      },
-    );
-
-    // Destination proxy: exact card silhouette at t=1.
-    destinationMorphAnimation = morphDestination.animate(
-      [
-        {
-          transform:
-            `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`,
-          opacity: 0,
-          offset: 0,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`,
-          opacity: 0,
-          offset: .34,
-        },
-        {
-          transform: 'translate3d(0,0,0) scale(1,1)',
-          opacity: 1,
-          offset: .70,
-        },
-        {
-          transform: 'translate3d(0,0,0) scale(1,1)',
-          opacity: 1,
-          offset: 1,
-        },
-      ],
-      {
-        duration: MORPH_DURATION,
-        easing: MORPH_EASING,
-        fill: 'forwards',
-      },
-    );
-
-    // Do not touch real layout while the proxies are moving.
-    Promise.all([
-      morphAnimation.finished.catch(() => undefined),
-      destinationMorphAnimation.finished.catch(() => undefined),
-    ]).then(() => {
+    window.requestAnimationFrame(() => {
       if (closed) return;
 
-      // The proxy is now stationary at the final shape. Pay the single
-      // layout/backdrop-filter paint while nothing is moving.
-      surface.style.opacity = '0';
+      // Reveal the already-rendered editor in the exact frame in which
+      // geometry starts expanding. This avoids the empty/black shell phase.
       surface.classList.add('is-expanded', 'is-editor-ready');
-
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          if (closed) return;
-
-          destinationFadeAnimation = surface.animate(
-            [{ opacity: 0 }, { opacity: 1 }],
-            {
-              duration: 96,
-              easing: 'ease-out',
-              fill: 'forwards',
-            },
-          );
-
-          const proxyFade = morphDestination.animate(
-            [{ opacity: 1 }, { opacity: 0 }],
-            {
-              duration: 96,
-              easing: 'ease-out',
-              fill: 'forwards',
-            },
-          );
-
-          Promise.all([
-            destinationFadeAnimation.finished.catch(() => undefined),
-            proxyFade.finished.catch(() => undefined),
-          ]).then(() => {
-            if (closed) return;
-
-            sourceFadeAnimation?.cancel();
-            destinationFadeAnimation?.cancel();
-            morphAnimation?.cancel();
-            destinationMorphAnimation?.cancel();
-            proxyFade.cancel();
-
-            morphShell.style.opacity = '0';
-            morphShell.style.transform = 'translate3d(0,0,0) scale(1,1)';
-            morphDestination.style.opacity = '0';
-            morphDestination.style.transform =
-              `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`;
-
-            surface.style.opacity = '1';
-            surface.classList.remove('is-morphing');
-
-            morphAnimation = null;
-            destinationMorphAnimation = null;
-            sourceFadeAnimation = null;
-            destinationFadeAnimation = null;
-            clearMorphTimers();
-          });
-        });
-      });
     });
   };
 
@@ -778,164 +482,33 @@ export function mountSamplerSurfaceDom(
 
   const resetShowcase = () => {
     if (environment !== 'showcase') return;
-    if (!surface.classList.contains('is-expanded')) return;
 
     if (demoResetTimer) window.clearTimeout(demoResetTimer);
     if (demoUnloadTimer) window.clearTimeout(demoUnloadTimer);
-    cancelMorphAnimations();
 
-    const collapsedScaleX = 198 / 352;
-    const collapsedScaleY = 50 / 336;
+    // First fade the editor while it is still fully rendered.
+    // Removing iframe.src immediately navigates it to about:blank and can
+    // expose a bright frame during the collapse.
+    surface.classList.remove('is-editor-ready');
 
-    morphShell.style.opacity = '0';
-    morphShell.style.transform =
-      `translate3d(0,0,0) scale(${EXPANDED_SCALE_X},${EXPANDED_SCALE_Y})`;
-
-    morphDestination.style.opacity = '1';
-    morphDestination.style.transform = 'translate3d(0,0,0) scale(1,1)';
-
-    surface.classList.add('is-morphing');
-
-    sourceFadeAnimation = surface.animate(
-      [{ opacity: 1 }, { opacity: 0 }],
-      {
-        duration: 86,
-        easing: 'ease-out',
-        fill: 'forwards',
-      },
-    );
-
-    morphAnimation = morphShell.animate(
-      [
-        {
-          transform:
-            `translate3d(0,0,0) scale(${EXPANDED_SCALE_X},${EXPANDED_SCALE_Y})`,
-          opacity: 0,
-          offset: 0,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${EXPANDED_SCALE_X},${EXPANDED_SCALE_Y})`,
-          opacity: 1,
-          offset: .30,
-        },
-        {
-          transform: 'translate3d(0,0,0) scale(1,1)',
-          opacity: 1,
-          offset: 1,
-        },
-      ],
-      {
-        duration: MORPH_DURATION,
-        easing: MORPH_EASING,
-        fill: 'forwards',
-      },
-    );
-
-    destinationMorphAnimation = morphDestination.animate(
-      [
-        {
-          transform: 'translate3d(0,0,0) scale(1,1)',
-          opacity: 1,
-          offset: 0,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`,
-          opacity: 1,
-          offset: .44,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`,
-          opacity: 0,
-          offset: .72,
-        },
-        {
-          transform:
-            `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`,
-          opacity: 0,
-          offset: 1,
-        },
-      ],
-      {
-        duration: MORPH_DURATION,
-        easing: MORPH_EASING,
-        fill: 'forwards',
-      },
-    );
-
-    Promise.all([
-      morphAnimation.finished.catch(() => undefined),
-      destinationMorphAnimation.finished.catch(() => undefined),
-    ]).then(() => {
-      if (closed) return;
-
-      surface.style.opacity = '0';
-      surface.classList.remove('is-editor-ready', 'is-expanded', 'is-frozen');
+    demoResetTimer = window.setTimeout(() => {
+      surface.classList.remove('is-expanded', 'is-frozen');
 
       frozenAt = null;
       startedAt = performance.now();
-      if (!timerRaf) timerRaf = window.requestAnimationFrame(renderTimer);
       smoothedPeak = .04;
       peaks.fill(.04);
       drawWave();
 
       editorReady = false;
       expandRequested = false;
+      editorLoadStarted = false;
+    }, 90);
 
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          if (closed) return;
-
-          const liveFade = surface.animate(
-            [{ opacity: 0 }, { opacity: 1 }],
-            {
-              duration: 90,
-              easing: 'ease-out',
-              fill: 'forwards',
-            },
-          );
-
-          const proxyFade = morphShell.animate(
-            [{ opacity: 1 }, { opacity: 0 }],
-            {
-              duration: 90,
-              easing: 'ease-out',
-              fill: 'forwards',
-            },
-          );
-
-          Promise.all([
-            liveFade.finished.catch(() => undefined),
-            proxyFade.finished.catch(() => undefined),
-          ]).then(() => {
-            if (closed) return;
-
-            sourceFadeAnimation?.cancel();
-            morphAnimation?.cancel();
-            destinationMorphAnimation?.cancel();
-            liveFade.cancel();
-            proxyFade.cancel();
-
-            surface.style.opacity = '1';
-            surface.classList.remove('is-morphing');
-
-            morphShell.style.opacity = '0';
-            morphShell.style.transform = 'translate3d(0,0,0) scale(1,1)';
-            morphDestination.style.opacity = '0';
-            morphDestination.style.transform =
-              `translate3d(0,0,0) scale(${collapsedScaleX},${collapsedScaleY})`;
-
-            morphAnimation = null;
-            destinationMorphAnimation = null;
-            sourceFadeAnimation = null;
-            destinationFadeAnimation = null;
-            clearMorphTimers();
-          });
-        });
-      });
-    });
+    // Unload only after both the editor fade and the island collapse are done.
+    demoUnloadTimer = window.setTimeout(() => {
+      frame.removeAttribute('src');
+    }, 520);
   };
 
   const requestStop = () => {
@@ -967,7 +540,6 @@ export function mountSamplerSurfaceDom(
     if (demoMeterTimer) window.clearInterval(demoMeterTimer);
     if (demoResetTimer) window.clearTimeout(demoResetTimer);
     if (demoUnloadTimer) window.clearTimeout(demoUnloadTimer);
-    cancelMorphAnimations();
 
     window.setTimeout(() => cleanup(), 140);
   };
@@ -1038,7 +610,6 @@ export function mountSamplerSurfaceDom(
     closed = true;
     window.cancelAnimationFrame(timerRaf);
     if (demoMeterTimer) window.clearInterval(demoMeterTimer);
-    cancelMorphAnimations();
     surface.removeEventListener('click', requestStop);
     window.removeEventListener('message', onWindowMessage);
     document.removeEventListener('pointerdown', onPointerDown, true);
@@ -1083,16 +654,6 @@ export function mountSamplerSurfaceDom(
 
   isolatedWindow.__tabSamplerSurfaceCleanup = cleanup;
 
-  if (environment === 'showcase') {
-    const scheduleIdle = window.requestIdleCallback
-      ? (callback: () => void) => window.requestIdleCallback(callback, { timeout: 250 })
-      : (callback: () => void) => window.setTimeout(callback, 80);
-
-    scheduleIdle(() => {
-      if (!closed) prepareEditor();
-    });
-  }
-
   drawWave();
   renderTimer();
 
@@ -1101,8 +662,6 @@ export function mountSamplerSurfaceDom(
     frozenAt = performance.now();
     expandRequested = true;
     prepareEditor();
-  } else if (environment === 'showcase') {
-    surface.classList.add('is-live');
   } else {
     window.requestAnimationFrame(() => {
       surface.classList.add('is-live');
