@@ -73,8 +73,8 @@ interface MorphIconProps {
 }
 
 const transition = {
-  duration: 0.16,
-  ease: [0.2, 0.8, 0.2, 1] as [number, number, number, number],
+  duration: 0.12,
+  ease: [0.22, 0.9, 0.28, 1] as [number, number, number, number],
 };
 
 export function MorphIcon({
