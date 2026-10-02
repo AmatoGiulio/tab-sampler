@@ -39,8 +39,8 @@ export function mountSamplerSurfaceDom(
       --morph-duration: 600ms;
 
       /* Glass density. Lower lets more of the page through. */
-      --glass-top: .74;
-      --glass-bottom: .80;
+      --glass-top: .82;
+      --glass-bottom: .90;
     }
 
     .stage {
@@ -170,7 +170,7 @@ export function mountSamplerSurfaceDom(
 
     .surface.is-expanded {
       width: 352px;
-      height: 336px;
+      height: 284px;
       border-radius: 48px;
       corner-shape: squircle;
       pointer-events: auto;
@@ -222,8 +222,8 @@ export function mountSamplerSurfaceDom(
     /* Continuity: island elements do not dissolve in place, they travel to
        what they become in the editor, on the shell's own spring.
        Targets are the editor's layout, measured from the anchor corner:
-       play control 72px, centre 60px from the right / 272px from the top;
-       waveform 304px wide, centre 176px / 120px. Compositor-only. */
+       play control 72px, centre 60px from the right / 224px from the top;
+       waveform 304px wide, centre 176px / 114px. Compositor-only. */
     .stop-control,
     .wave-wrap,
     .timer {
@@ -237,7 +237,7 @@ export function mountSamplerSurfaceDom(
        underneath it, and only then does it let go: no dip in the red. */
     .surface.is-expanded .stop-control {
       opacity: 0;
-      transform: translate3d(113px,247px,0) scale(3);
+      transform: translate3d(113px,199px,0) scale(3);
       transition:
         transform var(--morph-duration) var(--morph-spring),
         opacity 180ms ease-out 300ms;
@@ -270,7 +270,7 @@ export function mountSamplerSurfaceDom(
     .surface.is-expanded .wave-wrap {
       opacity: 0;
       filter: blur(1.5px);
-      transform: translate3d(-72px,95px,0) scale(3.378);
+      transform: translate3d(-72px,89px,0) scale(3.378);
       transition:
         transform var(--morph-duration) var(--morph-spring),
         opacity 120ms ease-out,
@@ -413,7 +413,7 @@ export function mountSamplerSurfaceDom(
       right: 0;
       display: block;
       width: 352px;
-      height: 336px;
+      height: 284px;
       border: 0;
       background: transparent;
       color-scheme: dark;
@@ -539,6 +539,33 @@ export function mountSamplerSurfaceDom(
   let editorReady = false;
   let expandRequested = false;
   let editorLoadStarted = false;
+  // The editor is loaded in standby while audio is still being captured, so
+  // stopping only has to hand it the sample.
+  let standbyReady = false;
+  let loadRequested = false;
+  let preloadTimer = 0;
+  // Every state in which the island waits on someone else (the background,
+  // the editor frame) has a deadline. A lost message or a frame the page
+  // refuses to load must not leave a frozen island on the page: it closes,
+  // and the sample stays available from the toolbar.
+  const WATCHDOG_MS = 12_000;
+  let watchdog = 0;
+  const standbySrc = `${src}${src.includes('?') ? '&' : '?'}standby=1`;
+
+  const disarmWatchdog = () => {
+    if (watchdog) window.clearTimeout(watchdog);
+    watchdog = 0;
+  };
+
+  const armWatchdog = (stillWaiting: () => boolean) => {
+    disarmWatchdog();
+    watchdog = window.setTimeout(() => {
+      watchdog = 0;
+      if (!closed && stillWaiting()) close();
+    }, WATCHDOG_MS);
+  };
+
+  const waitingToExpand = () => !surface.classList.contains('is-expanded');
 
   const resizeCanvas = () => {
     // Measure once per layout instead of forcing a synchronous layout on
@@ -682,6 +709,8 @@ export function mountSamplerSurfaceDom(
     window.requestAnimationFrame(() => {
       if (closed) return;
 
+      disarmWatchdog();
+
       // Reveal the already-rendered editor in the exact frame in which
       // geometry starts expanding. This avoids the empty/black shell phase.
       surface.classList.add('is-expanded', 'is-editor-ready');
@@ -692,20 +721,61 @@ export function mountSamplerSurfaceDom(
   };
 
   const prepareEditor = () => {
-    if (editorLoadStarted) return;
+    if (editorLoadStarted || closed) return;
     editorLoadStarted = true;
-    frame.src = src;
+    standbyReady = false;
+    // Always a fresh document, even when the address is unchanged.
+    frame.removeAttribute('src');
+    frame.src = standbySrc;
+  };
+
+  const requestLoad = () => {
+    loadRequested = true;
+    if (standbyReady) {
+      frame.contentWindow?.postMessage({ type: 'tab-sampler:load' }, '*');
+    }
+  };
+
+  const schedulePreload = (delay: number) => {
+    if (preloadTimer) window.clearTimeout(preloadTimer);
+    preloadTimer = window.setTimeout(prepareEditor, delay);
   };
 
   const expand = () => {
     freeze();
     expandRequested = true;
+    armWatchdog(waitingToExpand);
     prepareEditor();
+    requestLoad();
     revealEditor();
   };
 
-  const resetShowcase = () => {
-    if (environment !== 'showcase') return;
+  // Back to an empty recorder: no elapsed time, no level history.
+  const clearReadout = () => {
+    smoothedPeak = FLOOR;
+    pendingEnergy = 0;
+    targets.fill(FLOOR);
+    shown.fill(FLOOR);
+    drawWave();
+    timerText = '0:00';
+    timer.textContent = timerText;
+    canvasSize = null;
+  };
+
+  const goLive = () => {
+    disarmWatchdog();
+    clearReadout();
+    frozenAt = null;
+    startedAt = performance.now();
+    surface.classList.remove('is-frozen');
+    startLoop();
+  };
+
+  // Card back to island. With `live` the island resumes at once (showcase);
+  // without it the island stays in its "working" state until the background
+  // confirms that the next capture is running.
+  const collapseToIsland = (live: boolean) => {
+    if (closed || !surface.classList.contains('is-expanded')) return;
 
     if (demoResetTimer) window.clearTimeout(demoResetTimer);
     if (demoUnloadTimer) window.clearTimeout(demoUnloadTimer);
@@ -716,23 +786,33 @@ export function mountSamplerSurfaceDom(
     surface.classList.remove('is-editor-ready');
 
     demoResetTimer = window.setTimeout(() => {
-      surface.classList.remove('is-expanded', 'is-frozen');
+      surface.classList.remove('is-expanded');
 
-      frozenAt = null;
-      startedAt = performance.now();
-      smoothedPeak = FLOOR;
-      pendingEnergy = 0;
-      targets.fill(FLOOR);
-      startLoop();
-
+      // The editor in the frame has shown its sample and is spent: whatever
+      // expands next needs a new one, even if that happens before the swap
+      // below gets to run.
       editorReady = false;
       expandRequested = false;
+      loadRequested = false;
       editorLoadStarted = false;
+      standbyReady = false;
+
+      if (live) {
+        goLive();
+      } else {
+        clearReadout();
+        armWatchdog(
+          () => frozenAt !== null && !surface.classList.contains('is-expanded'),
+        );
+      }
     }, 90);
 
-    // Unload only after both the editor fade and the island collapse are done.
+    // Swap the used editor for a fresh standby one only after both the
+    // editor fade and the island collapse are done, and only if the island
+    // has not already been asked to expand again.
     demoUnloadTimer = window.setTimeout(() => {
-      frame.removeAttribute('src');
+      if (expandRequested || editorLoadStarted) return;
+      prepareEditor();
     }, 520);
   };
 
@@ -746,25 +826,36 @@ export function mountSamplerSurfaceDom(
     }
 
     freeze();
+    armWatchdog(waitingToExpand);
 
     if (environment === 'showcase') {
       window.setTimeout(expand, 60);
       return;
     }
 
-    void chrome.runtime.sendMessage({
-      type: 'tab-sampler:stop-request',
-    });
+    // After the extension is reloaded or updated, an island left on the page
+    // can no longer reach it: the call throws instead of sending.
+    try {
+      chrome.runtime
+        .sendMessage({ type: 'tab-sampler:stop-request' })
+        .catch((error: unknown) => {
+          if (/context invalidated/i.test(String(error))) close();
+        });
+    } catch {
+      close();
+    }
   };
 
   const close = () => {
     if (closed) return;
     closed = true;
+    disarmWatchdog();
     surface.classList.add('is-closing');
     window.cancelAnimationFrame(loopRaf);
     if (demoMeterTimer) window.clearInterval(demoMeterTimer);
     if (demoResetTimer) window.clearTimeout(demoResetTimer);
     if (demoUnloadTimer) window.clearTimeout(demoUnloadTimer);
+    if (preloadTimer) window.clearTimeout(preloadTimer);
 
     window.setTimeout(() => cleanup(), 200);
   };
@@ -787,6 +878,11 @@ export function mountSamplerSurfaceDom(
       return;
     }
 
+    if (message?.type === 'tab-sampler:island-restart') {
+      goLive();
+      return;
+    }
+
     if (message?.type === 'tab-sampler:island-close') {
       close();
     }
@@ -801,8 +897,14 @@ export function mountSamplerSurfaceDom(
       return;
     }
 
-    if (event.data?.type === 'tab-sampler:demo-reset') {
-      resetShowcase();
+    if (event.data?.type === 'tab-sampler:standby') {
+      standbyReady = true;
+      if (loadRequested) requestLoad();
+      return;
+    }
+
+    if (event.data?.type === 'tab-sampler:new-capture') {
+      collapseToIsland(environment === 'showcase');
       return;
     }
 
@@ -818,7 +920,7 @@ export function mountSamplerSurfaceDom(
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (environment === 'showcase' && event.key.toLowerCase() === 'r') {
-      resetShowcase();
+      collapseToIsland(true);
       return;
     }
 
@@ -835,6 +937,7 @@ export function mountSamplerSurfaceDom(
     closed = true;
     window.cancelAnimationFrame(loopRaf);
     if (demoMeterTimer) window.clearInterval(demoMeterTimer);
+    if (preloadTimer) window.clearTimeout(preloadTimer);
     surface.removeEventListener('click', requestStop);
     window.removeEventListener('message', onWindowMessage);
     document.removeEventListener('pointerdown', onPointerDown, true);
@@ -886,10 +989,14 @@ export function mountSamplerSurfaceDom(
     surface.classList.add('is-live', 'is-frozen');
     frozenAt = performance.now();
     expandRequested = true;
+    armWatchdog(waitingToExpand);
     prepareEditor();
+    requestLoad();
   } else {
     window.requestAnimationFrame(() => {
       surface.classList.add('is-live');
     });
+    // After the island has arrived, so the load never competes with it.
+    schedulePreload(700);
   }
 }

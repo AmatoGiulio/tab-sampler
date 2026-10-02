@@ -1,10 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import WaveSurfer from 'wavesurfer.js';
-import { formatSeconds, sampleFilename } from '../../audio/domain/format';
+import { detectTempo } from '../../audio/analysis/tempo';
+import { sampleFilename } from '../../audio/domain/format';
+import {
+  formatBeats,
+  selectionBeats,
+  snapSelectionToGrid,
+} from '../../audio/domain/loop';
 import { moveSelectionEdge, selectionDuration } from '../../audio/domain/selection';
 import type { LoadedSample, Selection } from '../../audio/domain/types';
-import { encodeSelectionAsWav } from '../../audio/export/wav-exporter';
+import { encodeLoopAsWav, encodeSelectionAsWav } from '../../audio/export/wav-exporter';
 import { PcmPlaybackEngine } from '../../audio/playback/pcm-playback-engine';
 import {
   deleteSample,
@@ -25,10 +31,17 @@ const DOUBLE_CLICK_ZOOM = 3;
 const EDGE_SCROLL_ZONE = 28;
 const EDGE_SCROLL_SPEED = 9;
 const NUDGE_SECONDS = 0.01;
+const TEMPO_ANALYSIS_DELAY_MS = 700;
+const MIN_TEMPO = 40;
+const MAX_TEMPO = 300;
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MIN_SELECTION_SECONDS = 0.025;
 const DEMO_MODE = new URLSearchParams(window.location.search).get('demo') === '1';
 const EMBEDDED = window.parent !== window;
+// Loaded ahead of time inside the island: mount everything, then wait to be
+// told that the sample exists before reading it.
+const STANDBY =
+  EMBEDDED && new URLSearchParams(window.location.search).get('standby') === '1';
 
 function createDemoSample(): LoadedSample {
   const sampleRate = 48_000;
@@ -68,6 +81,40 @@ function createDemoSample(): LoadedSample {
 }
 
 type TrimEdge = 'start' | 'end';
+
+// The waveform is redrawn on every frame of a zoom. Handing the renderer raw
+// PCM makes each of those frames walk every sample of the recording; an
+// envelope this long is more than the widest zoom can show and costs the
+// same for ten seconds as for ten minutes.
+const WAVEFORM_POINTS = 16_384;
+
+function waveformPeaks(channelData: Float32Array[]): Float32Array[] {
+  return channelData.map((channel) => {
+    if (channel.length <= WAVEFORM_POINTS * 2) return channel;
+
+    const peaks = new Float32Array(WAVEFORM_POINTS);
+    const bucket = channel.length / WAVEFORM_POINTS;
+
+    for (let index = 0; index < WAVEFORM_POINTS; index += 1) {
+      const end = Math.min(channel.length, Math.floor((index + 1) * bucket));
+      let extreme = 0;
+
+      for (let frame = Math.floor(index * bucket); frame < end; frame += 1) {
+        const value = channel[frame] ?? 0;
+        if (Math.abs(value) > Math.abs(extreme)) extreme = value;
+      }
+
+      peaks[index] = extreme;
+    }
+
+    return peaks;
+  });
+}
+
+// A pointer press should not leave a control focused: the focus ring is for
+// keyboard navigation, and a focused button would also swallow the next
+// space bar meant for play.
+const keepFocus = (event: React.MouseEvent) => event.preventDefault();
 
 interface VisibleRange {
   start: number;
@@ -109,7 +156,12 @@ function App() {
     edge: TrimEdge;
     pointerId: number;
     clientX: number;
+    free: boolean;
   } | null>(null);
+  const tempoRef = useRef<number | null>(null);
+  // The selection as it was before loop mode pulled it onto the grid, kept
+  // so that leaving loop mode untouched hands it back.
+  const loopSnapRef = useRef<{ before: Selection; snapped: Selection } | null>(null);
   const edgeScrollFrameRef = useRef<number | null>(null);
   const animateZoomRef = useRef<(nextZoom: number, anchor?: ZoomAnchor) => void>(
     () => undefined,
@@ -123,6 +175,8 @@ function App() {
   const [loop, setLoop] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [dragEdge, setDragEdge] = useState<TrimEdge | null>(null);
+  const [tempo, setTempo] = useState<number | null>(null);
+  const [tempoDraft, setTempoDraft] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [revealed, setRevealed] = useState(!EMBEDDED);
   const [exporting, setExporting] = useState(false);
@@ -138,6 +192,17 @@ function App() {
 
     const span = range.end - range.start;
     if (span <= 0 || time < range.start || time > range.end) {
+      element.style.opacity = '0';
+      return;
+    }
+
+    // Parked on a trim edge it would only sit on top of the handle. It
+    // shows again as soon as there is a position worth marking.
+    const active = selectionRef.current;
+    const parked =
+      !playbackRef.current?.isPlaying() &&
+      (Math.abs(time - active.start) < 0.002 || Math.abs(time - active.end) < 0.002);
+    if (parked) {
       element.style.opacity = '0';
       return;
     }
@@ -195,7 +260,7 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
-    void (async () => {
+    const load = async () => {
       try {
         if (DEMO_MODE) {
           if (!cancelled) setSample(createDemoSample());
@@ -211,10 +276,29 @@ function App() {
           setError(cause instanceof Error ? cause.message : 'Unable to load sample');
         }
       }
-    })();
+    };
+
+    if (!STANDBY) {
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    let requested = false;
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent || requested) return;
+      if (event.data?.type !== 'tab-sampler:load') return;
+      requested = true;
+      void load();
+    };
+
+    window.addEventListener('message', onMessage);
+    window.parent.postMessage({ type: 'tab-sampler:standby' }, '*');
 
     return () => {
       cancelled = true;
+      window.removeEventListener('message', onMessage);
     };
   }, []);
 
@@ -228,9 +312,9 @@ function App() {
     const playback = new PcmPlaybackEngine(sample);
     const wavesurfer = WaveSurfer.create({
       container: waveformRef.current,
-      peaks: sample.channelData,
+      peaks: waveformPeaks(sample.channelData),
       duration,
-      height: 108,
+      height: 96,
       waveColor: 'rgba(255,255,255,0.72)',
       progressColor: 'rgba(255,255,255,0.72)',
       cursorWidth: 0,
@@ -259,7 +343,8 @@ function App() {
       if (disposed) return;
       setPlaying(false);
       stopPlaybackFrame();
-      renderPlayhead(selectionRef.current.end);
+      // Finished: back to the start, ready to play again.
+      renderPlayhead(selectionRef.current.start);
     });
 
     const updateVisibleRange = (start: number, end: number) => {
@@ -535,6 +620,8 @@ function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement) return;
+
       if (event.key === ' ' && ready) {
         event.preventDefault();
         void togglePlayRef.current();
@@ -551,6 +638,59 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [ready]);
 
+  // Estimate the tempo once the editor has settled, never during the morph.
+  useEffect(() => {
+    if (!sample || !ready || !revealed) return;
+
+    const timer = window.setTimeout(() => {
+      if (tempoRef.current !== null) return;
+      const estimate = detectTempo(sample.channelData, sample.meta.sampleRate);
+      if (!estimate) return;
+      tempoRef.current = estimate.bpm;
+      setTempo(estimate.bpm);
+    }, TEMPO_ANALYSIS_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [sample, ready, revealed]);
+
+  const applySelection = (next: Selection) => {
+    selectionRef.current = next;
+    playbackRef.current?.setSelection(next);
+    setSelection(next);
+    renderPlayhead(playbackRef.current?.getCurrentTime() ?? next.start);
+  };
+
+  const commitTrim = () => {
+    const playback = playbackRef.current;
+    if (!playback) return;
+    void playback.restartInsideSelection().then(() => {
+      renderPlayhead(playback.getCurrentTime());
+      if (playback.isPlaying()) startPlaybackFrame();
+    });
+  };
+
+  // In loop mode with a known tempo the selection lives on the beat grid.
+  const gridTempo = () => (loopRef.current ? tempoRef.current : null);
+
+  const snapToGrid = (bpm: number) => {
+    if (!sample) return;
+    const snapped = snapSelectionToGrid(
+      selectionRef.current,
+      'end',
+      bpm,
+      sample.meta.duration,
+    );
+    if (!snapped) return;
+
+    // Keep the first "before": a tempo correction re-snaps, but what loop
+    // mode should hand back is still the selection the user had made.
+    loopSnapRef.current = {
+      before: loopSnapRef.current?.before ?? selectionRef.current,
+      snapped,
+    };
+    applySelection(snapped);
+  };
+
   const toggleLoop = async () => {
     const playback = playbackRef.current;
     if (!playback) return;
@@ -559,6 +699,19 @@ function App() {
       const next = !loopRef.current;
       loopRef.current = next;
       setLoop(next);
+
+      if (next) {
+        if (tempoRef.current) snapToGrid(tempoRef.current);
+      } else {
+        const snap = loopSnapRef.current;
+        const current = selectionRef.current;
+        if (snap && current.start === snap.snapped.start && current.end === snap.snapped.end) {
+          applySelection(snap.before);
+        }
+        loopSnapRef.current = null;
+        setTempoDraft(null);
+      }
+
       await playback.setLoop(next);
       if (playback.isPlaying()) startPlaybackFrame();
     } catch (cause) {
@@ -566,10 +719,27 @@ function App() {
     }
   };
 
-  const moveEdge = (edge: TrimEdge, time: number) => {
+  const changeTempo = (bpm: number) => {
+    const next = Math.round(clamp(bpm, MIN_TEMPO, MAX_TEMPO) * 10) / 10;
+    tempoRef.current = next;
+    setTempo(next);
+    if (loopRef.current) {
+      snapToGrid(next);
+      commitTrim();
+    }
+  };
+
+  const commitTempoDraft = () => {
+    if (tempoDraft === null) return;
+    const value = Number.parseFloat(tempoDraft.replace(',', '.'));
+    setTempoDraft(null);
+    if (Number.isFinite(value) && value > 0) changeTempo(value);
+  };
+
+  const moveEdge = (edge: TrimEdge, time: number, free = false) => {
     if (!sample) return;
 
-    const next = moveSelectionEdge(
+    let next = moveSelectionEdge(
       selectionRef.current,
       edge,
       time,
@@ -577,13 +747,15 @@ function App() {
       MIN_SELECTION_SECONDS,
     );
 
-    selectionRef.current = next;
-    playbackRef.current?.setSelection(next);
-    setSelection(next);
-    renderPlayhead(playbackRef.current?.getCurrentTime() ?? next.start);
+    const bpm = free ? null : gridTempo();
+    if (bpm) {
+      next = snapSelectionToGrid(next, edge, bpm, sample.meta.duration) ?? next;
+    }
+
+    applySelection(next);
   };
 
-  const trimAtPointer = (edge: TrimEdge, clientX: number) => {
+  const trimAtPointer = (edge: TrimEdge, clientX: number, free = false) => {
     if (!waveformRef.current) return;
 
     const rect = waveformRef.current.getBoundingClientRect();
@@ -594,7 +766,7 @@ function App() {
     if (span <= 0) return;
 
     const localProgress = clamp((clientX - rect.left) / rect.width, 0, 1);
-    moveEdge(edge, range.start + localProgress * span);
+    moveEdge(edge, range.start + localProgress * span, free);
   };
 
   const stopEdgeScroll = () => {
@@ -630,7 +802,7 @@ function App() {
 
         if (push !== 0) {
           wavesurfer.setScroll(wavesurfer.getScroll() + push * EDGE_SCROLL_SPEED);
-          trimAtPointer(active.edge, active.clientX);
+          trimAtPointer(active.edge, active.clientX, active.free);
         }
       }
 
@@ -644,11 +816,17 @@ function App() {
     if (!ready) return;
     event.preventDefault();
     event.stopPropagation();
-    trimDragRef.current = { edge, pointerId: event.pointerId, clientX: event.clientX };
+    // Holding Option leaves the grid for a free trim.
+    trimDragRef.current = {
+      edge,
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      free: event.altKey,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.focus({ preventScroll: true });
     setDragEdge(edge);
-    trimAtPointer(edge, event.clientX);
+    trimAtPointer(edge, event.clientX, event.altKey);
     startEdgeScroll();
   };
 
@@ -657,16 +835,8 @@ function App() {
     if (!active || active.pointerId !== event.pointerId) return;
     event.preventDefault();
     active.clientX = event.clientX;
-    trimAtPointer(active.edge, event.clientX);
-  };
-
-  const commitTrim = () => {
-    const playback = playbackRef.current;
-    if (!playback) return;
-    void playback.restartInsideSelection().then(() => {
-      renderPlayhead(playback.getCurrentTime());
-      if (playback.isPlaying()) startPlaybackFrame();
-    });
+    active.free = event.altKey;
+    trimAtPointer(active.edge, event.clientX, event.altKey);
   };
 
   const endTrim = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -692,7 +862,21 @@ function App() {
 
     const step = NUDGE_SECONDS * (event.shiftKey ? 10 : 1);
     const direction = event.key === 'ArrowLeft' ? -1 : 1;
-    moveEdge(edge, selectionRef.current[edge] + direction * step);
+
+    // On the grid the length is fixed by the tempo, so nudging slides the
+    // whole loop instead: that is how its start is lined up with the beat.
+    if (gridTempo() && !event.altKey && sample) {
+      const current = selectionRef.current;
+      const shift = clamp(
+        direction * step,
+        -current.start,
+        sample.meta.duration - current.end,
+      );
+      applySelection({ start: current.start + shift, end: current.end + shift });
+    } else {
+      moveEdge(edge, selectionRef.current[edge] + direction * step, true);
+    }
+
     commitTrim();
   };
 
@@ -704,18 +888,23 @@ function App() {
       playbackRef.current?.pause();
       stopPlaybackFrame();
 
+      // One gesture: the card folds back into the island and the next
+      // capture starts. The island collapses at once; the background starts
+      // recording and tells it when it is live (or closes it if Chrome
+      // refuses to capture without a new toolbar click).
+      window.parent.postMessage({ type: 'tab-sampler:new-capture' }, '*');
+
       if (DEMO_MODE) {
-        window.parent.postMessage({ type: 'tab-sampler:demo-reset' }, '*');
         setDiscarding(false);
         return;
       }
 
       await deleteSample(sample.meta.id);
-      await sendMessage('background:reset', { sampleId: sample.meta.id });
+      await sendMessage('background:new-capture', { sampleId: sample.meta.id });
+    } catch {
+      // The island is already collapsing and waiting to go live. If the
+      // background cannot be reached it never will: close it instead.
       window.parent.postMessage({ type: 'tab-sampler:close' }, '*');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to discard sample');
-      setDiscarding(false);
     }
   };
 
@@ -727,16 +916,35 @@ function App() {
       playbackRef.current?.pause();
       stopPlaybackFrame();
 
-      const blob = await encodeSelectionAsWav(sample, selectionRef.current);
+      // Loop mode exports a loop: seamless, with its tempo and length in
+      // the file and in its name. Otherwise the selection as recorded.
+      const active = selectionRef.current;
+      const bpm = tempoRef.current ?? undefined;
+      const beats = bpm ? selectionBeats(active, bpm) ?? undefined : undefined;
+      const loopInfo = {
+        ...(bpm !== undefined && beats !== undefined ? { bpm, beats } : {}),
+      };
+      const blob = loopRef.current
+        ? await encodeLoopAsWav(sample, active, loopInfo)
+        : await encodeSelectionAsWav(sample, active);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = sampleFilename(sample.meta.createdAt);
+      link.download = sampleFilename(
+        sample.meta.createdAt,
+        loopRef.current ? loopInfo : undefined,
+      );
       link.hidden = true;
       document.body.append(link);
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      // The showcase has no extension behind it: keep the editor open.
+      if (DEMO_MODE) {
+        setExporting(false);
+        return;
+      }
 
       await deleteSample(sample.meta.id);
       await sendMessage('background:reset', { sampleId: sample.meta.id });
@@ -769,6 +977,7 @@ function App() {
   const startBoundaryVisible = selection.start >= visibleRange.start && selection.start <= visibleRange.end;
   const endBoundaryVisible = selection.end >= visibleRange.start && selection.end <= visibleRange.end;
   const zoomed = zoom > 1.001;
+  const loopBeats = loop && tempo ? selectionBeats(selection, tempo) : null;
 
   return (
     <main
@@ -809,7 +1018,7 @@ function App() {
               <span className="trim-boundary__line" />
               <span className="trim-boundary__grip" />
               <span className="trim-boundary__time" aria-hidden="true">
-                {formatReferenceTime(selection[edge])}
+                {loopBeats ? formatBeats(loopBeats) : formatReferenceTime(selection[edge])}
               </span>
             </div>
           );
@@ -832,6 +1041,7 @@ function App() {
         <button
           type="button"
           className="utility-action"
+          onMouseDown={keepFocus}
           onClick={() => void newCapture()}
           disabled={discarding || exporting}
           aria-label="New capture"
@@ -842,21 +1052,85 @@ function App() {
         <button
           type="button"
           className="utility-action"
+          onMouseDown={keepFocus}
           onClick={() => void exportSample()}
           disabled={exporting || discarding || !ready}
-          aria-label="Export WAV"
-          title="Export WAV"
+          aria-label={loop ? 'Export loop' : 'Export WAV'}
+          title={loop ? 'Export loop' : 'Export WAV'}
         >
           <SystemIcon name="download" size={15} strokeWidth={2.2} />
         </button>
       </div>
 
+      <header className="sample-status">
+        <span className="sample-status__dot" aria-hidden="true" />
+        {!loop && <span>SAMPLED</span>}
+        {loop && tempoDraft === null && (
+          <>
+            <button
+              type="button"
+              className="tempo-chip"
+              onClick={() => setTempoDraft(tempo ? String(tempo) : '')}
+              aria-label={tempo ? `Tempo ${tempo} BPM, edit` : 'Set tempo'}
+              title="Edit tempo"
+            >
+              {tempo ? `${tempo} BPM` : 'SET BPM'}
+            </button>
+            {loopBeats && <span>{formatBeats(loopBeats).toUpperCase()}</span>}
+          </>
+        )}
+        {loop && tempoDraft !== null && (
+          <span className="tempo-edit">
+            <input
+              className="tempo-edit__input"
+              type="text"
+              inputMode="decimal"
+              autoFocus
+              value={tempoDraft}
+              placeholder="BPM"
+              aria-label="Tempo in BPM"
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => setTempoDraft(event.target.value)}
+              onBlur={commitTempoDraft}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitTempoDraft();
+                if (event.key === 'Escape') setTempoDraft(null);
+              }}
+            />
+            {tempo && (
+              <>
+                <button
+                  type="button"
+                  className="tempo-chip"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setTempoDraft(null);
+                    changeTempo(tempo / 2);
+                  }}
+                  aria-label="Halve tempo"
+                >
+                  ÷2
+                </button>
+                <button
+                  type="button"
+                  className="tempo-chip"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setTempoDraft(null);
+                    changeTempo(tempo * 2);
+                  }}
+                  aria-label="Double tempo"
+                >
+                  ×2
+                </button>
+              </>
+            )}
+          </span>
+        )}
+      </header>
+
       <footer className="controls">
         <div className="sample-meta">
-          <div className="sample-status">
-            <span className="sample-status__dot" aria-hidden="true" />
-            <span>SAMPLED</span>
-          </div>
           <div className="sample-time">
             {formatReferenceTime(selectionDuration(selection))}
           </div>
@@ -865,6 +1139,7 @@ function App() {
         <button
           type="button"
           className={`control control--loop ${loop ? 'is-active' : ''}`}
+          onMouseDown={keepFocus}
           onClick={() => void toggleLoop()}
           disabled={!ready}
           aria-pressed={loop}
@@ -877,6 +1152,7 @@ function App() {
         <button
           type="button"
           className="control control--play"
+          onMouseDown={keepFocus}
           onClick={() => void togglePlay()}
           disabled={!ready}
           aria-label={playing ? 'Pause' : 'Play selection'}

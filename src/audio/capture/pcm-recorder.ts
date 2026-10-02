@@ -114,7 +114,11 @@ export class PcmRecorder {
         'ended',
         () => {
           if (this.status !== 'recording') return;
-          void this.stop().then((meta) => this.unexpectedEndHandler?.(meta));
+          void this.stop()
+            .then((meta) => this.unexpectedEndHandler?.(meta))
+            .catch((error) => {
+              console.error('[tab-sampler] capture ended and could not be saved', error);
+            });
         },
         { once: true },
       );
@@ -148,7 +152,9 @@ export class PcmRecorder {
       this.sample = meta;
       return meta;
     } finally {
-      await this.releaseGraph();
+      // The sample is complete once it is finalized. Tearing the audio graph
+      // down must not hold up whoever is waiting to show it.
+      void this.releaseGraph().catch(() => undefined);
       this.status = 'idle';
     }
   }
@@ -190,20 +196,23 @@ export class PcmRecorder {
   }
 
   private async releaseGraph(): Promise<void> {
-    this.stream?.getTracks().forEach((track) => track.stop());
-    this.source?.disconnect();
-    this.recorderNode?.disconnect();
-    this.silentGain?.disconnect();
-
-    if (this.context && this.context.state !== 'closed') {
-      await this.context.close();
-    }
-
+    // Detach synchronously: a new capture may start while the old context is
+    // still closing, and must not have its graph cleared from under it.
+    const { stream, context, source, recorderNode, silentGain } = this;
     this.stream = null;
     this.context = null;
     this.source = null;
     this.recorderNode = null;
     this.silentGain = null;
     this.flushResolve = null;
+
+    stream?.getTracks().forEach((track) => track.stop());
+    source?.disconnect();
+    recorderNode?.disconnect();
+    silentGain?.disconnect();
+
+    if (context && context.state !== 'closed') {
+      await context.close();
+    }
   }
 }

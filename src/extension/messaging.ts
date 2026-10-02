@@ -8,6 +8,7 @@ interface ProtocolMap {
   'background:pulse'(data: { bright: boolean }): void;
   'background:meter'(data: { peak: number; rms: number }): void;
   'background:reset'(data: { sampleId?: string }): void;
+  'background:new-capture'(data: { sampleId?: string }): { started: boolean };
   'background:capture-ended'(data: { reason: string; sampleId: string }): void;
 }
 

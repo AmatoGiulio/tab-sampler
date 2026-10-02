@@ -24,8 +24,9 @@ The V1 extension contains no application backend, telemetry, analytics, advertis
 
 - `tabCapture`: capture audio from the current tab after the user explicitly clicks the extension action.
 - `offscreen`: keep the audio capture graph alive without opening a visible recorder window.
+- `activeTab` and `scripting`: after that same click, draw the recorder island and the editor on top of the current page. The injected code only creates that interface; it does not read the page's content, URL, or title.
 
-No host permissions or content scripts are required for the V1 flow.
+The extension requests no host permissions and declares no content scripts: nothing runs on a page the user has not clicked the extension on. The editor page is listed as a web-accessible resource so that it can be shown inside the injected interface.
 
 ## Chrome Web Store Limited Use
 

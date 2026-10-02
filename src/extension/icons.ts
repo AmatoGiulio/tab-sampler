@@ -4,50 +4,61 @@ type IconState = 'idle' | 'recording' | 'recordingDim' | 'editing';
 
 let cache = new Map<string, Record<number, ImageData>>();
 
-function roundedRect(
+// The toolbar wears the app icon: a dark squircle tile with five waveform
+// bars, the centre one in the record red. Same proportions as the packaged
+// icon-16/32.png, drawn here so every state shares one source.
+const TILE_INSET = 0.035;
+const BAR_HEIGHTS = [0.22, 0.44, 0.62, 0.44, 0.22];
+const BAR_WIDTH = 0.095;
+const BAR_PITCH = 0.158;
+const RECORD_RED = '#FF453A';
+
+function squircle(
   ctx: OffscreenCanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
+  size: number,
+  inset: number,
 ) {
-  const r = Math.min(radius, width / 2, height / 2);
+  const centre = size / 2;
+  const radius = centre - inset;
+  const exponent = 2 / 5;
+  const steps = 72;
+
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
+  for (let step = 0; step <= steps; step += 1) {
+    const angle = (step / steps) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const x = centre + radius * Math.sign(cos) * Math.abs(cos) ** exponent;
+    const y = centre + radius * Math.sign(sin) * Math.abs(sin) ** exponent;
+    if (step === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
   ctx.closePath();
 }
 
-function drawWaveGlyph(
+function drawBars(
   ctx: OffscreenCanvasRenderingContext2D,
   size: number,
-  color: string,
+  tile: number,
+  whiteAlpha: number,
 ) {
-  const s = size / 16;
-  const cx = size / 2;
-  const cy = size / 2;
-  const bars = [
-    { x: -4.6, h: 3.0 },
-    { x: -2.3, h: 6.2 },
-    { x: 0, h: 9.2 },
-    { x: 2.3, h: 6.2 },
-    { x: 4.6, h: 3.0 },
-  ];
+  const centre = size / 2;
+  const width = tile * BAR_WIDTH;
 
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.4 * s;
+  ctx.lineWidth = width;
   ctx.lineCap = 'round';
 
-  for (const bar of bars) {
+  BAR_HEIGHTS.forEach((height, index) => {
+    const x = centre + (index - 2) * tile * BAR_PITCH;
+    // Round caps add half a bar width at each end.
+    const half = Math.max(0, (tile * height - width) / 2);
+
+    ctx.strokeStyle = index === 2 ? RECORD_RED : `rgba(247,247,245,${whiteAlpha})`;
     ctx.beginPath();
-    ctx.moveTo(cx + bar.x * s, cy - (bar.h * s) / 2);
-    ctx.lineTo(cx + bar.x * s, cy + (bar.h * s) / 2);
+    ctx.moveTo(x, centre - half);
+    ctx.lineTo(x, centre + half + 0.01);
     ctx.stroke();
-  }
+  });
 }
 
 function drawIcon(size: number, state: IconState): ImageData {
@@ -68,24 +79,18 @@ function drawIcon(size: number, state: IconState): ImageData {
       : '#D92E25';
     ctx.fill();
   } else {
-    roundedRect(ctx, 1.3 * s, 2.0 * s, 13.4 * s, 12 * s, 3.3 * s);
-    const gradient = ctx.createLinearGradient(0, 2 * s, 0, 14 * s);
-    gradient.addColorStop(0, 'rgba(64,64,67,.98)');
-    gradient.addColorStop(1, 'rgba(26,26,28,.98)');
+    const inset = size * TILE_INSET;
+    const tile = size - inset * 2;
+
+    squircle(ctx, size, inset);
+    const gradient = ctx.createLinearGradient(0, inset, 0, size - inset);
+    gradient.addColorStop(0, 'rgb(58,58,63)');
+    gradient.addColorStop(1, 'rgb(19,19,22)');
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(255,255,255,.34)';
-    ctx.lineWidth = .7 * s;
-    ctx.stroke();
-
-    drawWaveGlyph(
-      ctx,
-      size,
-      state === 'editing'
-        ? 'rgba(255,255,255,.76)'
-        : 'rgba(255,255,255,.96)',
-    );
+    // A waiting sample dims the white bars; the tile itself never changes.
+    drawBars(ctx, size, tile, state === 'editing' ? 0.72 : 1);
   }
 
   return ctx.getImageData(0, 0, size, size);
@@ -103,6 +108,12 @@ function getIconData(state: IconState): Record<number, ImageData> {
   return data;
 }
 
+// A tab can close or navigate between the decision to paint its icon and the
+// call landing. That must never abort the state change that asked for it.
+function tolerant<T>(tabId: number | undefined, call: Promise<T>): Promise<T | void> {
+  return tabId === undefined ? call : call.catch(() => undefined);
+}
+
 async function clearBadge(tabId?: number): Promise<void> {
   const details = tabId === undefined ? {} : { tabId };
   await browser.action.setBadgeText({ ...details, text: '' });
@@ -115,14 +126,17 @@ async function applyIcon(
 ): Promise<void> {
   const details = tabId === undefined ? {} : { tabId };
 
-  await Promise.all([
-    browser.action.setIcon({
-      ...details,
-      imageData: getIconData(state),
-    }),
-    browser.action.setTitle({ ...details, title }),
-    clearBadge(tabId),
-  ]);
+  await tolerant(
+    tabId,
+    Promise.all([
+      browser.action.setIcon({
+        ...details,
+        imageData: getIconData(state),
+      }),
+      browser.action.setTitle({ ...details, title }),
+      clearBadge(tabId),
+    ]),
+  );
 }
 
 export function setIdleAction(tabId?: number): Promise<void> {
@@ -133,16 +147,19 @@ export function setRecordingAction(tabId?: number): Promise<void> {
   return applyIcon('recording', 'Recording - click to stop', tabId);
 }
 
-export function setRecordingPulse(
+export async function setRecordingPulse(
   bright: boolean,
   tabId?: number,
 ): Promise<void> {
   const details = tabId === undefined ? {} : { tabId };
 
-  return browser.action.setIcon({
-    ...details,
-    imageData: getIconData(bright ? 'recording' : 'recordingDim'),
-  });
+  await tolerant(
+    tabId,
+    browser.action.setIcon({
+      ...details,
+      imageData: getIconData(bright ? 'recording' : 'recordingDim'),
+    }),
+  );
 }
 
 export function setEditingAction(tabId?: number): Promise<void> {

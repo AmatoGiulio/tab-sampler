@@ -24,7 +24,17 @@ Required only after the user clicks the toolbar action. It provides the active t
 
 Required because the recorder must remain alive while the user returns to the page and the popup is closed. The offscreen document owns the Web Audio graph and local PCM persistence.
 
-No broad host permissions, `activeTab`, content scripts, history access, cookies, downloads permission, or site-specific scraping are needed for V1. The capture request relies on the explicit toolbar gesture and does not pass `targetTabId`.
+### `activeTab` + `scripting`
+
+Required to draw the recorder island and the editor over the page the user clicked the action on. `scripting.executeScript` injects one self-contained function that builds that interface in a shadow root; it reads nothing from the page. `activeTab` scopes this to the tab the user invoked the extension on, so no host permissions are requested.
+
+### Web-accessible `editor.html`
+
+The editor is an extension page shown in an iframe inside the injected interface, which requires it to be web accessible. Consequences to state honestly in review: any page can detect that the extension is installed by probing that URL, and any page can embed the editor. An embedding page cannot read the sample (it is cross-origin extension storage), but this is the reason the editor never exposes data through `postMessage`.
+
+"New capture" restarts recording from inside the editor. That is not a toolbar click, so it passes `targetTabId`; Chrome honours it only while the tab's `activeTab` grant from the original click still stands, and the extension falls back to requiring a new toolbar click when it does not.
+
+No broad host permissions, declared content scripts, history access, cookies, downloads permission, or site-specific scraping are needed for V1.
 
 ## User-data disclosure
 

@@ -22,8 +22,8 @@ body,
 #root {
   width: 352px;
   min-width: 352px;
-  height: 336px;
-  min-height: 336px;
+  height: 284px;
+  min-height: 284px;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -39,11 +39,17 @@ button { font: inherit; }
 .editor {
   position: relative;
   width: 352px;
-  min-height: 336px;
-  padding: 22px 24px 20px;
+  min-height: 284px;
+  /* Two measures. 24px: every outer margin, and the gap between waveform
+     and controls. 12px: every gutter between neighbours (header to
+     waveform, action to action, loop to play).
+       24 | 28 header | 12 | 100 waveform | 24 | 72 controls | 24
+     The header (status on the left, actions on the right) is positioned in
+     the top padding. */
+  padding: 64px 24px 24px;
   display: grid;
-  grid-template-rows: 1fr 88px;
-  gap: 10px;
+  grid-template-rows: 100px 72px;
+  gap: 24px;
   overflow: hidden;
 
   border-radius: 48px;
@@ -76,7 +82,7 @@ button { font: inherit; }
 
 .editor--loading,
 .editor--error {
-  min-height: 336px;
+  min-height: 284px;
   display: grid;
   place-items: center;
 }
@@ -92,13 +98,12 @@ button { font: inherit; }
 
 .wave-shell {
   position: relative;
-  min-height: 194px;
+  height: 100px;
   display: grid;
   align-items: center;
   /* Handles and their time labels may sit on the very edge of the wave. */
   overflow: visible;
   isolation: isolate;
-  margin: 0 0;
   --trim-start: 0%;
   --trim-end: 100%;
   --trimmed-density: .26;
@@ -166,8 +171,9 @@ button { font: inherit; }
 .trim-boundary {
   position: absolute;
   z-index: 8;
-  top: 30px;
-  bottom: 30px;
+  /* Exactly the wave row. */
+  top: 0;
+  bottom: 0;
   width: 28px;
   margin-left: -14px;
   cursor: ew-resize;
@@ -272,10 +278,8 @@ button { font: inherit; }
   z-index: 6;
   left: 25%;
   right: 25%;
-  /* On the centre line of the utility actions: they sit 11px from the
-     card's top and are 28px tall (centre 25px); the wave shell starts at
-     the card's 22px top padding. */
-  top: calc(11px + 28px / 2 - 22px - 3px / 2);
+  /* Centred in the 24px gap under the wave row. */
+  top: calc(100% + 24px / 2 - 3px / 2);
   height: 3px;
   border-radius: 999px;
   background: rgba(255,255,255,.1);
@@ -285,6 +289,12 @@ button { font: inherit; }
   transition:
     opacity 180ms ease,
     transform 260ms cubic-bezier(.2,.9,.3,1.25);
+}
+
+/* That gap is also where a moving handle hangs its time: the indicator
+   steps aside for it. */
+.wave-shell.is-zoomed:has(.trim-boundary.is-dragging, .trim-boundary:focus-visible) .zoom-range {
+  opacity: 0;
 }
 
 .wave-shell.is-zoomed .zoom-range {
@@ -304,8 +314,8 @@ button { font: inherit; }
 .playhead {
   position: absolute;
   z-index: 7;
-  top: 28px;
-  bottom: 28px;
+  top: -2px;
+  bottom: -2px;
   left: 0;
   width: 2px;
   border-radius: 999px;
@@ -338,8 +348,9 @@ button { font: inherit; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) 52px 72px;
   align-items: center;
-  gap: 9px;
-  padding: 0 0 0 2px;
+  /* Same 12px gutter as between the waveform and the action column. */
+  gap: 12px;
+  padding: 0;
 }
 
 .editor.is-revealed .controls {
@@ -351,10 +362,20 @@ button { font: inherit; }
 .sample-meta {
   min-width: 0;
   align-self: center;
-  padding-left: 2px;
+  /* Centre what is seen, not the box: the figures' ink sits half a pixel
+     low in the line box. */
+  position: relative;
+  top: -.5px;
 }
 
+/* Left side of the header, on the same centre line as the actions. */
 .sample-status {
+  position: absolute;
+  z-index: 10;
+  top: 24px;
+  left: 24px;
+  height: 28px;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -363,7 +384,58 @@ button { font: inherit; }
   font-weight: 600;
   letter-spacing: .07em;
   line-height: 1;
+  white-space: nowrap;
 }
+
+/* The tempo is a value you can correct: it looks and behaves like one. */
+.tempo-chip {
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.94);
+  font: inherit;
+  letter-spacing: .04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    transform 160ms cubic-bezier(.2,.9,.3,1.25);
+}
+
+.tempo-chip:hover { background: rgba(255,255,255,.18); }
+.tempo-chip:active { transform: scale(.94); }
+
+.tempo-chip:focus-visible,
+.tempo-edit__input:focus-visible {
+  outline: 1.5px solid rgba(255,255,255,.55);
+  outline-offset: 1px;
+}
+
+.tempo-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tempo-edit__input {
+  width: 46px;
+  margin: 0;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  font: inherit;
+  letter-spacing: .02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+}
+
+.tempo-edit__input::placeholder { color: rgba(255,255,255,.4); }
 
 .sample-status__dot {
   width: 7px;
@@ -375,7 +447,9 @@ button { font: inherit; }
 }
 
 .sample-time {
-  margin-top: 9px;
+  /* The first figure carries ~1px of side bearing: pull it back so the
+     digits start on the same line as the dot above and the handle. */
+  margin: 0 0 0 -1px;
   color: #fff;
   /* Proportional face with tabular figures: the digits hold their columns
      while the value changes, without a monospace's wide punctuation. */
@@ -536,11 +610,12 @@ button { font: inherit; }
 
 .utility-actions {
   position: absolute;
-  top: 11px;
-  right: 14px;
+  /* Right side of the header, on the same right edge as the play control. */
+  top: 24px;
+  right: 24px;
   z-index: 20;
   display: flex;
-  gap: 6px;
+  gap: 12px;
   opacity: .62;
   transition: opacity 140ms ease;
 }

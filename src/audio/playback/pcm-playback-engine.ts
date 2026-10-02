@@ -1,3 +1,4 @@
+import { renderSeamlessLoop } from '../domain/loop';
 import type { LoadedSample, Selection } from '../domain/types';
 
 function clamp(value: number, min: number, max: number): number {
@@ -23,6 +24,9 @@ export class PcmPlaybackEngine {
   private source: AudioBufferSourceNode | null = null;
   private selection: Selection;
   private looping = false;
+  // True while the live source is playing a rendered, click-free copy of the
+  // loop rather than a region of the recording.
+  private seamless = false;
   private position = 0;
   private startedAt = 0;
   private startedOffset = 0;
@@ -63,10 +67,18 @@ export class PcmPlaybackEngine {
     this.selection = normalizeSelection(selection, this.sample.meta.duration);
     this.position = clamp(current, this.selection.start, this.selection.end);
 
-    if (this.source) {
-      this.source.loopStart = this.selection.start;
-      this.source.loopEnd = this.selection.end;
+    if (!this.source) return;
+
+    // A rendered loop is fixed audio. While its edges are being moved, fall
+    // back to looping the recording directly so the change is heard live;
+    // the seamless copy is rebuilt when playback restarts in the selection.
+    if (this.seamless && this.context) {
+      this.start(this.context, this.position, false);
+      return;
     }
+
+    this.source.loopStart = this.selection.start;
+    this.source.loopEnd = this.selection.end;
   }
 
   async setLoop(looping: boolean): Promise<void> {
@@ -83,7 +95,10 @@ export class PcmPlaybackEngine {
 
   async play(fromTime = this.position): Promise<void> {
     const context = await this.ensureContext();
-    const buffer = this.buffer!;
+    this.start(context, fromTime, this.looping);
+  }
+
+  private start(context: AudioContext, fromTime: number, seamless: boolean): void {
     const selection = this.selection;
     const length = selection.end - selection.start;
 
@@ -97,10 +112,27 @@ export class PcmPlaybackEngine {
 
     const source = context.createBufferSource();
     const generation = ++this.generation;
-    source.buffer = buffer;
-    source.loop = this.looping;
-    source.loopStart = selection.start;
-    source.loopEnd = selection.end;
+
+    if (seamless) {
+      // What loops in the editor is the same audio the loop export writes.
+      const loop = renderSeamlessLoop(this.sample, selection);
+      const buffer = context.createBuffer(
+        this.sample.meta.channels,
+        Math.max(1, loop.frames),
+        this.sample.meta.sampleRate,
+      );
+      loop.channelData.forEach((data, channel) => {
+        buffer.copyToChannel(data as Float32Array<ArrayBuffer>, channel);
+      });
+      source.buffer = buffer;
+      source.loop = true;
+    } else {
+      source.buffer = this.buffer!;
+      source.loop = this.looping;
+      source.loopStart = selection.start;
+      source.loopEnd = selection.end;
+    }
+
     source.connect(context.destination);
 
     source.onended = () => {
@@ -111,11 +143,14 @@ export class PcmPlaybackEngine {
     };
 
     this.source = source;
+    this.seamless = seamless;
     this.position = offset;
     this.startedAt = context.currentTime;
     this.startedOffset = offset;
 
-    if (this.looping) {
+    if (seamless) {
+      source.start(0, offset - selection.start);
+    } else if (this.looping) {
       source.start(0, offset);
     } else {
       source.start(0, offset, Math.max(0, selection.end - offset));
@@ -194,7 +229,8 @@ export class PcmPlaybackEngine {
 
       for (let channel = 0; channel < this.sample.meta.channels; channel += 1) {
         const data = this.sample.channelData[channel];
-        if (data) buffer.copyToChannel(data, channel);
+        // Captured PCM is always backed by a plain ArrayBuffer.
+        if (data) buffer.copyToChannel(data as Float32Array<ArrayBuffer>, channel);
       }
 
       this.context = context;
