@@ -18,8 +18,7 @@ import {
   loadSample,
 } from '../../audio/store/sample-store';
 import { sendMessage } from '../../extension/messaging';
-import { PlayPauseIcon } from '../../ui/PlayPauseIcon';
-import { SystemIcon } from '../../ui/SystemIcon';
+import { DotMatrixIcon } from '../../ui/DotMatrixIcon';
 import './styles.css';
 
 const EMPTY_SELECTION: Selection = { start: 0, end: 0 };
@@ -989,10 +988,13 @@ function App() {
         style={{
           '--trim-start': `${startPercent}%`,
           '--trim-end': `${endPercent}%`,
+          '--fade-start': `${Math.max(startPercent, endPercent - Math.min(18, (endPercent - startPercent) * 0.34))}%`,
         } as React.CSSProperties}
       >
         <span className="record-seed" aria-hidden="true" />
+        <div className="sample-strip" aria-hidden="true" />
         <div ref={waveformRef} className="waveform" />
+        <span className="op1-fade" aria-hidden="true" />
         {(['start', 'end'] as const).map((edge) => {
           const visible = edge === 'start' ? startBoundaryVisible : endBoundaryVisible;
           if (!visible) return null;
@@ -1047,7 +1049,7 @@ function App() {
           aria-label="New capture"
           title="New capture"
         >
-          <SystemIcon name="plus" size={15} strokeWidth={2.2} />
+          <DotMatrixIcon name="plus" size={17} />
         </button>
         <button
           type="button"
@@ -1058,7 +1060,7 @@ function App() {
           aria-label={loop ? 'Export loop' : 'Export WAV'}
           title={loop ? 'Export loop' : 'Export WAV'}
         >
-          <SystemIcon name="download" size={15} strokeWidth={2.2} />
+          <DotMatrixIcon name="download" size={17} />
         </button>
       </div>
 
@@ -1146,7 +1148,7 @@ function App() {
           aria-label="Loop selection"
           title="Loop selection"
         >
-          <SystemIcon name="repeat" size={22} strokeWidth={2} />
+          <DotMatrixIcon name="repeat" size={23} />
         </button>
 
         <button
@@ -1158,7 +1160,7 @@ function App() {
           aria-label={playing ? 'Pause' : 'Play selection'}
           title={playing ? 'Pause' : 'Play selection'}
         >
-          <PlayPauseIcon playing={playing} size={28} />
+          <DotMatrixIcon name={playing ? 'pause' : 'play'} size={30} />
         </button>
       </footer>
     </main>
