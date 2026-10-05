@@ -664,3 +664,221 @@ button { font: inherit; }
   opacity: .28;
   cursor: default;
 }
+
+
+/* -------------------------------------------------------------------------
+   OP-1 / dot-matrix visual study
+   Keep the current shell and motion; change only the instrument language.
+   ------------------------------------------------------------------------- */
+
+.wave-shell {
+  border-radius: 13px;
+}
+
+.sample-strip {
+  position: absolute;
+  z-index: 0;
+  inset: 7px 0;
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(231,233,224,.96), rgba(194,198,188,.94));
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.38) inset,
+    0 1px 0 rgba(255,255,255,.12);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sample-strip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(0,0,5,.84);
+  transform: translateY(-.5px);
+}
+
+.waveform {
+  z-index: 2;
+  height: 100%;
+  padding: 8px 0;
+  filter: none;
+  mix-blend-mode: multiply;
+  mask-image:
+    linear-gradient(
+      90deg,
+      rgba(0,0,0,.22) var(--trim-start),
+      #000 var(--trim-start),
+      #000 var(--trim-end),
+      rgba(0,0,0,.18) var(--trim-end)
+    );
+  mask-composite: initial;
+}
+
+.op1-fade {
+  position: absolute;
+  z-index: 4;
+  top: 7px;
+  bottom: 7px;
+  left: var(--fade-start);
+  right: calc(100% - var(--trim-end));
+  min-width: 1px;
+  border-right: 1.5px solid #e43b2d;
+  background: rgba(86,88,88,.30);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  pointer-events: none;
+}
+
+.op1-fade::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -10px;
+  width: 20px;
+  height: 5px;
+  background: #e43b2d;
+}
+
+.trim-boundary {
+  z-index: 7;
+}
+
+.trim-boundary__line {
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.trim-boundary--start {
+  color: #496b96;
+}
+
+.trim-boundary--end {
+  color: #a67b4e;
+}
+
+.trim-boundary__line::before,
+.trim-boundary__line::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 18px;
+  height: 5px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+.trim-boundary__line::before { top: -5px; }
+.trim-boundary__line::after { bottom: -5px; }
+
+.trim-boundary__grip {
+  width: 4px;
+  height: 30px;
+  margin: -15px 0 0 -2px;
+  border-radius: 2px;
+  background: currentColor;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.18);
+}
+
+.trim-boundary:hover .trim-boundary__line,
+.trim-boundary:focus-visible .trim-boundary__line,
+.trim-boundary.is-dragging .trim-boundary__line {
+  background: currentColor;
+}
+
+.trim-boundary:hover .trim-boundary__grip,
+.trim-boundary:focus-visible .trim-boundary__grip {
+  transform: scale(1.15, 1.08);
+}
+
+.trim-boundary.is-dragging .trim-boundary__grip {
+  transform: scale(1.35, 1.14);
+}
+
+.playhead {
+  z-index: 6;
+  top: 7px;
+  bottom: 7px;
+  width: 1.5px;
+  border-radius: 0;
+  background: #e43b2d;
+  box-shadow: none;
+}
+
+.editor.is-ready .playhead {
+  box-shadow: none;
+}
+
+.dot-matrix-icon {
+  display: block;
+  overflow: visible;
+  color: currentColor;
+}
+
+.dot-matrix-icon__dot {
+  fill: currentColor;
+  opacity: .13;
+  transition:
+    opacity 130ms ease,
+    transform 180ms cubic-bezier(.2,.8,.2,1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dot-matrix-icon__dot.is-lit {
+  opacity: .98;
+}
+
+.utility-action:hover .dot-matrix-icon__dot.is-lit,
+.control:hover:not(:disabled) .dot-matrix-icon__dot.is-lit {
+  transform: scale(1.08);
+}
+
+.utility-action {
+  background: rgba(255,255,255,.035);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.055) inset,
+    0 4px 10px rgba(0,0,0,.12);
+}
+
+.control--loop {
+  color: rgba(255,255,255,.82);
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,.075),
+      rgba(255,255,255,.035));
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.22),
+    0 0 0 1px rgba(255,255,255,.055) inset;
+}
+
+.control--loop.is-active {
+  color: #f5f5f2;
+  background:
+    linear-gradient(180deg, rgba(78,80,77,.92), rgba(46,47,45,.94));
+}
+
+.control--play {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255,255,255,.12), transparent 34%),
+    linear-gradient(180deg, #ef4438 0%, #d92c24 100%);
+}
+
+.control--play .dot-matrix-icon__dot {
+  opacity: .18;
+}
+
+.control--play .dot-matrix-icon__dot.is-lit {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-matrix-icon__dot {
+    transition-duration: 1ms;
+  }
+}
